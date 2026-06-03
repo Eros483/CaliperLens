@@ -88,7 +88,7 @@ function ChatInterface() {
       <header className="navbar">
         <div className="navbar-container">
           <div className="navbar-logo">
-            <img src="/foresighthealth_logo.jpeg" alt="Foresight Health Logo" className="logo-icon" />
+            <img src="/caliper_lens.png" alt="Caliper Logo" className="logo-icon" />
             <span className="logo-text">Caliper</span>
           </div>
 
@@ -127,6 +127,7 @@ function ChatInterface() {
               </div>
               <h2>CaliperLens</h2>
               <p className="empty-subtitle">Ask questions about your healthcare data</p>
+              <p className="hipaa-notice">Backend not publicly available due to HIPAA compliance</p>
             </div>
           </div>
         ) : (
