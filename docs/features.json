@@ -1,0 +1,317 @@
+{
+  "project": "caliperlens",
+  "last_updated": "2026-08-02",
+  "summary": {
+    "total": 11,
+    "completed": 0,
+    "in_progress": 0,
+    "planned": 11,
+    "tests_passing": 0,
+    "tests_failing": 0,
+    "tests_missing": 11
+  },
+  "features": [
+    {
+      "id": "F001",
+      "name": "Foundation — Structural Overhaul",
+      "description": "Bring the repo into AGENTS.md compliance. Makefile, TypeScript, Tailwind v4, Zustand, uv, black/ruff/prettier/eslint, tests, docs. No feature behavior changes.",
+      "status": "planned",
+      "priority": "high",
+      "module": "root + frontend + backend",
+      "design_doc": "docs/design.md",
+      "tests": {
+        "status": "missing",
+        "files": [],
+        "notes": "Tests written as part of this phase: unit tests for existing backend core/ logic, component render tests for React components"
+      },
+      "subtasks": [
+        {"id": "F001-1", "name": "Create root Makefile with setup/dev/test/style/build/clean targets", "status": "planned"},
+        {"id": "F001-2", "name": "Add infra-up/infra-down/dbt-run/eval Makefile targets", "status": "planned"},
+        {"id": "F001-3", "name": "Configure uv + pyproject.toml, remove requirements.txt", "status": "planned"},
+        {"id": "F001-4", "name": "Configure black + ruff, format/lint all Python", "status": "planned"},
+        {"id": "F001-5", "name": "Migrate frontend .jsx -> .tsx with strict tsconfig.json", "status": "planned"},
+        {"id": "F001-6", "name": "Install TailwindCSS v4, replace all .css with utility classes", "status": "planned"},
+        {"id": "F001-7", "name": "Add Zustand chat store, extract state from components", "status": "planned"},
+        {"id": "F001-8", "name": "Configure Prettier + ESLint for frontend", "status": "planned"},
+        {"id": "F001-9", "name": "Move config.py from core/ to utils/, clean BaseSettings usage", "status": "planned"},
+        {"id": "F001-10", "name": "Write backend pytest tests (mirror core/ and api/v1/)", "status": "planned"},
+        {"id": "F001-11", "name": "Write frontend Vitest + RTL tests", "status": "planned"},
+        {"id": "F001-12", "name": "Create docs/problem.md", "status": "planned"}
+      ],
+      "notes": "This is the longest phase. Every subsequent phase depends on the scaffolding created here. Existing behavior must not regress.",
+      "added": "2026-08-02",
+      "completed": null
+    },
+    {
+      "id": "F002",
+      "name": "Rebrand — CaliperLens Everywhere",
+      "description": "Replace all old naming (Caliper, Caliper-SQL-generator) with CaliperLens. Rename GitHub repo. Fix license. Remove dead assets.",
+      "status": "planned",
+      "priority": "high",
+      "module": "root + frontend + backend",
+      "design_doc": "docs/design.md",
+      "tests": {
+        "status": "missing",
+        "files": [],
+        "notes": "Tests: verify title tags, API title, package.json name contain CaliperLens"
+      },
+      "subtasks": [
+        {"id": "F002-1", "name": "Rename GitHub repo Caliper-SQL-generator -> CaliperLens, update remote", "status": "planned"},
+        {"id": "F002-2", "name": "Update README clone URLs, title, description to CaliperLens", "status": "planned"},
+        {"id": "F002-3", "name": "Update package.json name to caliperlens", "status": "planned"},
+        {"id": "F002-4", "name": "Update index.html title tag", "status": "planned"},
+        {"id": "F002-5", "name": "Update main.py FastAPI title and version", "status": "planned"},
+        {"id": "F002-6", "name": "Update ChatInterface brand text and navbar", "status": "planned"},
+        {"id": "F002-7", "name": "Fill LICENSE copyright line, evaluate license change", "status": "planned"},
+        {"id": "F002-8", "name": "Remove foresighthealth_logo.jpeg and .png assets", "status": "planned"},
+        {"id": "F002-9", "name": "Remove root package-lock.json (empty placeholder)", "status": "planned"}
+      ],
+      "notes": "Can execute in parallel with F001 (independent file sets). License: Apache 2.0 is permissive; evaluate proprietary or AGPL if usage restrictions desired.",
+      "added": "2026-08-02",
+      "completed": null
+    },
+    {
+      "id": "F003",
+      "name": "LLM Migration — AWS Bedrock to Gemini 3.5 Flash",
+      "description": "Drop AWS Bedrock, standardize on Google Gemini 3.5 Flash for reasoning and text-embedding-004 for embeddings. Clean config. Remove os.environ abuse.",
+      "status": "planned",
+      "priority": "high",
+      "module": "backend",
+      "design_doc": "docs/design.md",
+      "tests": {
+        "status": "missing",
+        "files": [],
+        "notes": "Tests: mock Gemini API, verify agent initializes without AWS, verify settings object has no AWS fields"
+      },
+      "subtasks": [
+        {"id": "F003-1", "name": "Remove boto3 dependency, remove AWS credentials from settings", "status": "planned"},
+        {"id": "F003-2", "name": "Update _setup_llm() to use ChatGoogleGenerativeAI (gemini-3.5-flash)", "status": "planned"},
+        {"id": "F003-3", "name": "Verify GoogleGenerativeAIEmbeddings (text-embedding-004) works as primary", "status": "planned"},
+        {"id": "F003-4", "name": "Remove os.environ blocks in agent.py, inject settings via DI", "status": "planned"},
+        {"id": "F003-5", "name": "Clean config.py: pure BaseSettings, no os.getenv() defaults, no manual load_dotenv()", "status": "planned"},
+        {"id": "F003-6", "name": "Rename Langsmith_API_KEY -> langsmith_api_key (snake_case)", "status": "planned"},
+        {"id": "F003-7", "name": "Update .env.example: remove AWS keys, keep GEMINI_API_KEY", "status": "planned"},
+        {"id": "F003-8", "name": "Remove unused GROQ_API_KEY and google_provider fallback flag", "status": "planned"}
+      ],
+      "notes": "Gemini 3.5 Flash is new (announced 2025). Verify langchain-google-genai supports it. Fallback provider logic should be generic pattern, not AWS-specific.",
+      "added": "2026-08-02",
+      "completed": null
+    },
+    {
+      "id": "F004",
+      "name": "Data Pipeline — dbt + DuckDB + Airflow",
+      "description": "Build a dbt project that transforms raw MySQL tables into analytics-ready DuckDB marts. Schedule via Airflow locally. Agent queries DuckDB, not raw MySQL.",
+      "status": "planned",
+      "priority": "high",
+      "module": "dbt + airflow + backend",
+      "design_doc": "docs/design.md",
+      "tests": {
+        "status": "missing",
+        "files": [],
+        "notes": "Tests: dbt tests (not_null, unique, relationships), model compilation succeeds, Airflow DAG import test"
+      },
+      "subtasks": [
+        {"id": "F004-1", "name": "Initialize dbt project with dbt-duckdb adapter", "status": "planned"},
+        {"id": "F004-2", "name": "Create staging models (stg_patient, stg_lob, stg_patient_score, etc.)", "status": "planned"},
+        {"id": "F004-3", "name": "Create intermediate models (int_patient_scores, int_patient_conditions)", "status": "planned"},
+        {"id": "F004-4", "name": "Create mart models (dim_patients, dim_conditions, fct_patient_metrics, fct_interventions)", "status": "planned"},
+        {"id": "F004-5", "name": "Add dbt tests (not_null, unique, accepted_values, relationships)", "status": "planned"},
+        {"id": "F004-6", "name": "Add dbt model documentation (descriptions for columns, tables)", "status": "planned"},
+        {"id": "F004-7", "name": "Create Airflow DAG (caliperlens_pipeline) with docker-compose.airflow.yaml", "status": "planned"},
+        {"id": "F004-8", "name": "Update SchemaRAG context library to describe DuckDB marts", "status": "planned"},
+        {"id": "F004-9", "name": "Update SchemaGraph to reflect DuckDB mart schema (simpler joins)", "status": "planned"},
+        {"id": "F004-10", "name": "Add make dbt-run target", "status": "planned"},
+        {"id": "F004-11", "name": "Update .env.example with DuckDB path", "status": "planned"}
+      ],
+      "notes": "MySQL source DB retained (immutable source of truth). dbt runs are idempotent. DuckDB file mounts read-only into sandbox. Agent query complexity drops significantly (queries marts, not raw tables).",
+      "added": "2026-08-02",
+      "completed": null
+    },
+    {
+      "id": "F005",
+      "name": "Sandbox — Docker-Isolated Code Execution",
+      "description": "Run all agent-generated Python and SQL code inside Docker containers with --network none, CPU/memory caps, timeout, and read-only DB mounts.",
+      "status": "planned",
+      "priority": "high",
+      "module": "sandbox + backend",
+      "design_doc": "docs/design.md",
+      "tests": {
+        "status": "missing",
+        "files": [],
+        "notes": "Tests: verify network isolation (no outbound requests), resource cap enforcement, timeout kills rogue processes, read-only mount prevents writes"
+      },
+      "subtasks": [
+        {"id": "F005-1", "name": "Write sandbox/Dockerfile (python:3.12-slim + matplotlib)", "status": "planned"},
+        {"id": "F005-2", "name": "Write sandbox/entrypoint.sh (accepts code via stdin or file mount)", "status": "planned"},
+        {"id": "F005-3", "name": "Implement SandboxExecutor in backend/core/ with docker-py", "status": "planned"},
+        {"id": "F005-4", "name": "Configure Docker run params: --network none, --cpus=1, --memory=256m, --pids-limit=50, 30s timeout", "status": "planned"},
+        {"id": "F005-5", "name": "Mount DuckDB file read-only, mount writable /tmp for artifacts", "status": "planned"},
+        {"id": "F005-6", "name": "Capture stdout, stderr, exit code, output files from container", "status": "planned"},
+        {"id": "F005-7", "name": "Wire SandboxExecutor into agent tool definitions", "status": "planned"},
+        {"id": "F005-8", "name": "Add health check: verify sandbox Docker image exists and is runnable", "status": "planned"}
+      ],
+      "notes": "This provides the security boundary for all agent-generated code. No agent code runs directly in the backend process. The sandbox is a prerequisite for F011 (Analysis + Charts).",
+      "added": "2026-08-02",
+      "completed": null
+    },
+    {
+      "id": "F006",
+      "name": "Eval Harness — NL-to-SQL Quality Measurement",
+      "description": "Create 20-25 NL questions with expected SQL structures and result shapes. Scripted runner reports pass-rate and auto-repair-rate. CI runs it on every push.",
+      "status": "planned",
+      "priority": "high",
+      "module": "eval",
+      "design_doc": "docs/design.md",
+      "tests": {
+        "status": "missing",
+        "files": [],
+        "notes": "Tests: verify all 20-25 questions parse correctly, runner CLI works, validation checks catch known-bad SQL"
+      },
+      "subtasks": [
+        {"id": "F006-1", "name": "Define eval question schema (question, expected_sql_contains, expected_result_shape, category)", "status": "planned"},
+        {"id": "F006-2", "name": "Write 20-25 questions covering: simple_select, filtered_select, join, aggregation, multi_step, edge_cases", "status": "planned"},
+        {"id": "F006-3", "name": "Implement runner.py (sends questions to /api/v1/chat, validates SQL + result shape)", "status": "planned"},
+        {"id": "F006-4", "name": "Implement SQL structure validation (contains expected clauses, LIMIT check, org_id filter check)", "status": "planned"},
+        {"id": "F006-5", "name": "Implement result shape validation (type check, row count range, value range)", "status": "planned"},
+        {"id": "F006-6", "name": "Calculate pass-rate and auto-repair-rate metrics", "status": "planned"},
+        {"id": "F006-7", "name": "Add make eval target", "status": "planned"},
+        {"id": "F006-8", "name": "Add GitHub Actions job to run eval on push", "status": "planned"}
+      ],
+      "notes": "This is the baseline measurement tool. Must be implemented before any agent behavior changes (F007 planner, F010 analysis) so we can measure improvement. Runner should handle agent non-determinism (same question can produce validly-different SQL).",
+      "added": "2026-08-02",
+      "completed": null
+    },
+    {
+      "id": "F007",
+      "name": "Planner + Multi-turn Memory",
+      "description": "Add a planner node that decomposes complex questions into ordered multi-step plans. Track plan execution state. Re-plan on failure. Preserve conversation context across messages in a session.",
+      "status": "planned",
+      "priority": "high",
+      "module": "backend/core",
+      "design_doc": "docs/design.md",
+      "tests": {
+        "status": "missing",
+        "files": [],
+        "notes": "Tests: planner generates valid plan structure, re-planning triggers on failure, multi-turn context preserves prior queries"
+      },
+      "subtasks": [
+        {"id": "F007-1", "name": "Define plan Pydantic schema (steps with action type, description, status)", "status": "planned"},
+        {"id": "F007-2", "name": "Implement planner LangGraph node (generates ordered plan from user question)", "status": "planned"},
+        {"id": "F007-3", "name": "Implement task-state tracking (plan_state dict with per-step pending/running/done/failed)", "status": "planned"},
+        {"id": "F007-4", "name": "Implement conditional edge: on step failure, route back to planner with error context", "status": "planned"},
+        {"id": "F007-5", "name": "Update validate_answer_node to detect step-level failure (not just query failure)", "status": "planned"},
+        {"id": "F007-6", "name": "Enable multi-turn memory (preserve chat history across messages in session)", "status": "planned"},
+        {"id": "F007-7", "name": "Update frontend to display plan progress (step counter, current step description)", "status": "planned"},
+        {"id": "F007-8", "name": "Add planning-related prompts to prompt_module.py", "status": "planned"}
+      ],
+      "notes": "This is the biggest agent capability upgrade. The planner node sits before table discovery. Plans support step types: query, analyze, chart. Multi-turn memory leverages existing MemorySaver + session_id system.",
+      "added": "2026-08-02",
+      "completed": null
+    },
+    {
+      "id": "F008",
+      "name": "Auth + Security",
+      "description": "JWT-based API authentication, per-user rate limiting, read-only DB credentials, secrets audit. Hardcoded org_id becomes JWT-claims-based.",
+      "status": "planned",
+      "priority": "high",
+      "module": "backend",
+      "design_doc": "docs/design.md",
+      "tests": {
+        "status": "missing",
+        "files": [],
+        "notes": "Tests: JWT token validation, rate limiter enforcement, read-only DB user cannot write, org_id scoping works per-user"
+      },
+      "subtasks": [
+        {"id": "F008-1", "name": "Implement POST /api/v1/auth/login with JWT (access + refresh tokens)", "status": "planned"},
+        {"id": "F008-2", "name": "Add FastAPI dependency to validate Authorization header on all /api/v1/* endpoints", "status": "planned"},
+        {"id": "F008-3", "name": "Implement per-user rate limiting on /api/v1/chat (slowapi or Redis counter)", "status": "planned"},
+        {"id": "F008-4", "name": "Create read-only MySQL user for dbt extracts, read-only DuckDB user for agent", "status": "planned"},
+        {"id": "F008-5", "name": "Make org_id configurable from JWT claims, remove hardcoded org_id=16", "status": "planned"},
+        {"id": "F008-6", "name": "Secrets audit: no keys in logs, traces, error messages. LangSmith trace sanitization.", "status": "planned"},
+        {"id": "F008-7", "name": "Update .env.example with JWT_SECRET_KEY and rate limit config", "status": "planned"}
+      ],
+      "notes": "Rate limiting prevents Gemini API cost abuse. Read-only DB access is a defense-in-depth measure alongside sandbox isolation. org_id scoping prevents cross-org data access.",
+      "added": "2026-08-02",
+      "completed": null
+    },
+    {
+      "id": "F009",
+      "name": "Infra + CI — Docker Compose + GitHub Actions",
+      "description": "Containerize backend. Docker-compose for full local stack (backend, Airflow, Prometheus, Grafana, sandbox). GitHub Actions CI pipeline.",
+      "status": "planned",
+      "priority": "medium",
+      "module": "root + .github",
+      "design_doc": "docs/design.md",
+      "tests": {
+        "status": "missing",
+        "files": [],
+        "notes": "Tests: docker-compose spins up successfully, health check reports all services OK, CI workflow triggers on push"
+      },
+      "subtasks": [
+        {"id": "F009-1", "name": "Write Dockerfile for FastAPI backend (multi-stage, gunicorn + uvicorn)", "status": "planned"},
+        {"id": "F009-2", "name": "Write docker-compose.yaml (backend + Airflow webserver/scheduler/postgres + Prometheus + Grafana + sandbox)", "status": "planned"},
+        {"id": "F009-3", "name": "Add make infra-up and make infra-down targets", "status": "planned"},
+        {"id": "F009-4", "name": "Add GET /api/v1/health with downstream dependency checks", "status": "planned"},
+        {"id": "F009-5", "name": "Write .github/workflows/ci.yaml (make setup, make style, make test, make eval)", "status": "planned"},
+        {"id": "F009-6", "name": "Add README badges (build status, license, tech stack)", "status": "planned"}
+      ],
+      "notes": "CI eval-on-push is critical for agent quality regression prevention. docker-compose local stack is the primary deployment model (frontend on Vercel, everything else local).",
+      "added": "2026-08-02",
+      "completed": null
+    },
+    {
+      "id": "F010",
+      "name": "Observability — LangSmith + Prometheus + Grafana + Structured Logging",
+      "description": "Full tracing via LangSmith. Prometheus metrics from FastAPI. Grafana dashboard. Structured JSON logging with trace IDs for end-to-end run reconstruction.",
+      "status": "planned",
+      "priority": "medium",
+      "module": "backend + infra",
+      "design_doc": "docs/design.md",
+      "tests": {
+        "status": "missing",
+        "files": [],
+        "notes": "Tests: Prometheus /metrics endpoint exposes expected counters, Grafana dashboard JSON is valid, log lines include trace_id"
+      },
+      "subtasks": [
+        {"id": "F010-1", "name": "Enable LangSmith full tracing (node-by-node graph execution, tool calls, retries)", "status": "planned"},
+        {"id": "F010-2", "name": "Instrument FastAPI with prometheus-fastapi-instrumentator (/metrics endpoint)", "status": "planned"},
+        {"id": "F010-3", "name": "Add custom metrics: per-LangGraph-node execution time, sandbox execution time, error rate by type", "status": "planned"},
+        {"id": "F010-4", "name": "Configure Prometheus in docker-compose (scrape backend /metrics)", "status": "planned"},
+        {"id": "F010-5", "name": "Build Grafana dashboard JSON: p95/p99 latency, plan success rate, sandbox time, error rates, cost per query", "status": "planned"},
+        {"id": "F010-6", "name": "Convert logger to python-json-logger with trace_id, session_id, node_name fields", "status": "planned"},
+        {"id": "F010-7", "name": "Propagate trace_id through graph nodes and tool calls", "status": "planned"}
+      ],
+      "notes": "All monitoring runs locally (Prometheus + Grafana in docker-compose). LangSmith is the only cloud dependency here (SaaS). Structured logging enables grep-based debugging alongside dashboards.",
+      "added": "2026-08-02",
+      "completed": null
+    },
+    {
+      "id": "F011",
+      "name": "Analysis + Charts — Sandboxed Statistics and Visualization",
+      "description": "Agent can perform statistical analysis and generate charts via sandboxed Python execution. Return structured analysis and chart images to the frontend.",
+      "status": "planned",
+      "priority": "medium",
+      "module": "backend/core + sandbox + frontend",
+      "design_doc": "docs/design.md",
+      "tests": {
+        "status": "missing",
+        "files": [],
+        "notes": "Tests: analysis routine returns correct stats, chart generation produces valid PNG, sandbox rejects malicious code, output contracts validated"
+      },
+      "subtasks": [
+        {"id": "F011-1", "name": "Define analysis output Pydantic schema (stats dict, trend detection results)", "status": "planned"},
+        {"id": "F011-2", "name": "Implement analysis code template (descriptive stats, linear regression for trends)", "status": "planned"},
+        {"id": "F011-3", "name": "Define chart output Pydantic schema (chart_type, chart_data_base64, title)", "status": "planned"},
+        {"id": "F011-4", "name": "Implement chart code template (matplotlib: bar, line, scatter, histogram, pie)", "status": "planned"},
+        {"id": "F011-5", "name": "Wire sandbox execution into planner step types (analyze, chart)", "status": "planned"},
+        {"id": "F011-6", "name": "Add output contract validation (Pydantic schema check on sandbox return)", "status": "planned"},
+        {"id": "F011-7", "name": "Add tool definitions so agent can dispatch analyze/chart steps", "status": "planned"},
+        {"id": "F011-8", "name": "Update frontend ChatMessage to render charts (base64 images)", "status": "planned"},
+        {"id": "F011-9", "name": "Update frontend ChatMessage to render analysis tables", "status": "planned"}
+      ],
+      "notes": "Dependent on F004 (sandbox) and F006 (planner). No plotly (keeps sandbox image small). matplotlib pre-installed in sandbox Dockerfile. Chart artifacts returned as base64-encoded PNGs to avoid file serving complexity.",
+      "added": "2026-08-02",
+      "completed": null
+    }
+  ]
+}
