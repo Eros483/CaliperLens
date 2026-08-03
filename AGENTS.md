@@ -233,5 +233,5 @@ Subagents are defined in `~/.config/opencode/agents/` and available globally. Al
 - **Deprecated assets to remove**: AWS credentials (`AWS_ACCESS_KEY`, `AWS_SECRET_KEY`, `AWS_SESSION_TOKEN`), ForesightHealth logos, `requirements.txt` (replaced by `uv`/`pyproject.toml`), `package-lock.json` in root (placeholder), bare `.jsx` files (migrated to `.tsx`).
 - **Files that must not be touched**: The MySQL SQL dump data files. The `data/` directory is input-only, never modified by the pipeline.
 - **Deployment**: Frontend only, deployed to Vercel (static). The frontend displays "Backend not publicly available due to HIPAA compliance." No backend-to-frontend connection in production; all backend/infra runs locally via `make infra-up`.
-- **License**: Apache 2.0. The copyright line in LICENSE needs to be filled with the owner's name. If usage restrictions beyond Apache 2.0 are desired, the license should be changed to a proprietary or AGPL/CC BY-NC-ND license.
+- **License**: BUSL-1.1. Free for personal/educational/portfolio use. Production or commercial deployment requires a separate license from the author. Converts to Apache 2.0 on 2030-01-01.
 - **Legacy naming**: `Caliper-SQL-generator` in old git remote, README clone instructions, and package.json name. All references must be changed to `CaliperLens`.

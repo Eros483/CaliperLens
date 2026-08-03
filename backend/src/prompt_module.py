@@ -1,5 +1,6 @@
 # ----- Prompt Templates for SQL Agent @ backend/src/prompt_module.py ------
 
+
 def select_table_prompt_module() -> str:
     """
     Generates the system prompt for the table selection/discovery phase.
@@ -10,22 +11,22 @@ def select_table_prompt_module() -> str:
     """
     return """
     You are a database architect. Your job is to select the tables required to answer the user's question.
-    
+
     SEARCH STRATEGY:
     1. **Core Entities:** Identify the main nouns (e.g., "Patient", "Cohort", "Claim"). Search for these directly.
     2. **The "Missing Link":** If the user asks for "Patients with Risk X", you need a way to connect them.
-       - DO NOT assume a direct link exists. 
+       - DO NOT assume a direct link exists.
        - Search for "Bridge Tables" using keywords like `map`, `metric`, `assignment`, `history`, or `detail`.
        - Example: If searching for `cohort` and `patient`, also look for `map_cohort` or `patient_cohort`.
-    
+
     Output your response as a JSON object with a "table_names" list.
     """
 
 
 def generate_query_prompt_module(db, org_id=None) -> str:
-   dialect = db.dialect
+    dialect = db.dialect
 
-   base_prompt=f"""
+    base_prompt = f"""
    You are a generic SQL Expert Agent. You are capable of reasoning through complex schemas using tools.
 
    ### CRITICAL EXECUTION RULE
@@ -40,7 +41,7 @@ def generate_query_prompt_module(db, org_id=None) -> str:
    1. **Understand the Data Types:**
       - Do not guess if a column is a String or an ID.
       - Use `sql_db_get_column_info` to check if a column is `BINARY(16)` (requires HEX formatting) or `INTEGER` (numeric).
-      
+
    2. **Find the Path (The "Join" Problem):**
       - If you need to join Table A and Table B, but they don't have matching column names:
       - **STOP.** Do not guess `ON a.id = b.id`.
@@ -58,7 +59,7 @@ def generate_query_prompt_module(db, org_id=None) -> str:
       - **ALWAYS** wrap binary columns in `HEX()` or `BIN_TO_UUID()` when selecting them.
       - Example: `SELECT BIN_TO_UUID(patient_id) as patient_id, ...`
       - When filtering: `WHERE patient_id = UNHEX('user_provided_string')`
-      
+
    2. **NULL Handling:**
       - If you see NULL in sample rows, it does NOT mean "no data exists".
       - NULL might mean that specific patient has no score YET.
@@ -109,58 +110,59 @@ def generate_query_prompt_module(db, org_id=None) -> str:
 
    Dialect: {dialect}
    """
-   if org_id:
-      security_context = f"""
+    if org_id:
+        security_context = f"""
       \n\n### 🔒 SECURITY CONTEXT (MANDATORY):
       - The active user belongs to **Organization ID {org_id}**.
       - You MUST apply a filter for `organization.org_id = {org_id}` to EVERY query involving patients or sensitive data.
       - **JOIN PATH FOR SECURITY:**
          To filter `patient` by Org {org_id}, you must join:
-         `patient` 
+         `patient`
          JOIN `map_patient_metrics` ON patient.patient_id = map_patient_metrics.patient_id
          JOIN `lob` ON map_patient_metrics.lob_id = lob.lob_id
          JOIN `organization` ON lob.org_guid = organization.org_guid
          WHERE organization.org_id = {org_id}
       - Do NOT output data for any other organization.
       """
-      return base_prompt + security_context
-   return base_prompt
+        return base_prompt + security_context
+    return base_prompt
+
 
 def query_verification_prompt_module(db) -> str:
-   """
-   Generates the system prompt for the query verification phase (Code Reviewer).
-   Ensures syntax correctness and proper binary column handling before execution.
+    """
+    Generates the system prompt for the query verification phase (Code Reviewer).
+    Ensures syntax correctness and proper binary column handling before execution.
 
-   Args:
-      db: The LangChain SQLDatabase object.
+    Args:
+       db: The LangChain SQLDatabase object.
 
-   Returns:
-      str: The system prompt for correcting SQL errors.
-   """
-   return f"""
+    Returns:
+       str: The system prompt for correcting SQL errors.
+    """
+    return f"""
    You are a Code Reviewer. Check the generated SQL for specific logical errors.
-   
+
    Dialect: {db.dialect}
-   
+
    CHECKLIST:
-   1. **The Binary Check:** - Did the agent select a `BINARY(16)` column (like `patient_id`, `uuid`, `guid`) *without* wrapping it in `HEX()`? 
+   1. **The Binary Check:** - Did the agent select a `BINARY(16)` column (like `patient_id`, `uuid`, `guid`) *without* wrapping it in `HEX()`?
       - If yes, REWRITE the query to use `HEX(column)`. This is the #1 cause of errors.
-   
+
    2. **The Join Check:**
       - Are the joins logical? (e.g., Joining `patient` to `cohort` directly without a bridge table if one is required).
-   
+
    3. **The Syntax Check:**
       - Correct quoting, correct `LIKE` syntax, correct usage of `NOW()` vs `CURRENT_DATE()`.
-   
+
    4. **Security Violations:**
       - Does the query properly filter by the Organization ID requested in the system prompt?
-   
+
    If mistakes are found, rewrite the query. If correct, reproduce it.
    """
 
 
 def answer_validation_prompt_module() -> str:
-   return """
+    return """
    You are a Quality Assurance Engineer. Validate the relationship between the User's Question and the SQL Result.
 
    User Question: {question}
@@ -171,7 +173,7 @@ def answer_validation_prompt_module() -> str:
 
    1. **Binary Garbage Detection:**
       - Look at the `result`. Does it contain python byte strings like `b'\\x00...'` or `\\x89P4...'`?
-      - If YES: Respond **STATUS: RETRY**. 
+      - If YES: Respond **STATUS: RETRY**.
       - Feedback: "The query returned raw Binary data. You must rewrite the query to select `HEX(column_name)` or `BIN_TO_UUID(column_name)` instead of the raw column."
 
    2. **Empty Results (Legitimate Check):**

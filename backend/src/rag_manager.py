@@ -1,12 +1,12 @@
 # ----- Schema RAG Manager @ backend/src/rag_manager.py ------
 
-import os
 from langchain_community.utilities import SQLDatabase
-from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from langchain_community.vectorstores import FAISS
 from langchain_core.documents import Document
+from langchain_google_genai import GoogleGenerativeAIEmbeddings
+
+from backend.utils.config import settings
 from backend.utils.logger import get_logger
-from backend.core.config import settings
 
 logger = get_logger(__name__)
 
@@ -14,10 +14,10 @@ logger = get_logger(__name__)
 class SchemaRAG:
     """
     Manages semantic search over the database schema.
-    
-    This class indexes table schemas and manual 'business dictionary' descriptions 
-    into a vector store (FAISS). It allows the agent to find relevant tables 
-    based on natural language queries, bridging the gap between user terminology 
+
+    This class indexes table schemas and manual 'business dictionary' descriptions
+    into a vector store (FAISS). It allows the agent to find relevant tables
+    based on natural language queries, bridging the gap between user terminology
     and technical table names.
     """
 
@@ -30,8 +30,7 @@ class SchemaRAG:
         """
         self.db = db
         self.embeddings = GoogleGenerativeAIEmbeddings(
-            model="models/text-embedding-004",
-            google_api_key=settings.GEMINI_API_KEY
+            model="models/text-embedding-004", google_api_key=settings.gemini_api_key
         )
         self.vector_store = None
         self._build_index()
@@ -39,10 +38,10 @@ class SchemaRAG:
     def _get_table_info(self):
         """
         Scans the database and constructs semantic documents for each table.
-        
-        This method combines the raw SQL schema (columns/types) with manually 
+
+        This method combines the raw SQL schema (columns/types) with manually
         injected 'Business Context' strings using a compositional tag system.
-        This context is critical for helping the LLM understand relationships 
+        This context is critical for helping the LLM understand relationships
         (e.g., bridge tables) and jargon (e.g., 'LOB' = Insurance).
 
         Returns:
@@ -60,9 +59,8 @@ class SchemaRAG:
                 "MANDATORY for ANY query asking: 'Who', 'Patient Names', 'List patients', 'Demographics'",
                 "Primary Key: patient_id (BINARY(16) UUID - use HEX() when selecting)",
                 "Foreign Keys: patient_coordinator (links to user table)",
-                "Hub Table: Connects to almost all other tables via patient_id"
+                "Hub Table: Connects to almost all other tables via patient_id",
             ],
-            
             "contributor_type": [
                 "MASTER DIAGNOSIS/CONDITION/SDOH DICTIONARY",
                 "Contains ALL medical and social conditions in the system",
@@ -74,9 +72,8 @@ class SchemaRAG:
                 "  - is_diag (BOOL): 1 if medical diagnosis, 0 otherwise",
                 "  - is_sdoh (BOOL): 1 if social determinant of health",
                 "  - org_id (INT): Which organization defined this contributor",
-                "Join To: contributor_individual.contr_type = contributor_type.contr_type"
+                "Join To: contributor_individual.contr_type = contributor_type.contr_type",
             ],
-            
             "contributor_individual": [
                 "BRIDGE TABLE: Patient-to-Diagnosis/Condition Link",
                 "Purpose: Links individual patients to their specific diagnoses/conditions/SDOH risks",
@@ -86,9 +83,8 @@ class SchemaRAG:
                 "  - contr_type (INT): Links to contributor_type table",
                 "  - identified_on_date (DATE): When condition was identified",
                 "  - src_label (VARCHAR): Source of identification",
-                "Join Path: patient.patient_id = contributor_individual.patient_id AND contributor_individual.contr_type = contributor_type.contr_type"
+                "Join Path: patient.patient_id = contributor_individual.patient_id AND contributor_individual.contr_type = contributor_type.contr_type",
             ],
-            
             "lob": [
                 "LINE OF BUSINESS (LOB) = INSURANCE TYPE",
                 "Purpose: Represents different insurance plans/types within organizations",
@@ -100,9 +96,8 @@ class SchemaRAG:
                 "  - org_guid (BINARY(16)): Links to organization",
                 "Join Paths:",
                 "  - To Patients: lob.lob_id = map_patient_metrics.lob_id",
-                "  - To Organization: lob.org_guid = organization.org_guid"
+                "  - To Organization: lob.org_guid = organization.org_guid",
             ],
-            
             "map_patient_metrics": [
                 "CENTRAL HUB / BRIDGE TABLE",
                 "Purpose: Links patients to their insurance (LOB), programs, plans, and provider groups",
@@ -117,9 +112,8 @@ class SchemaRAG:
                 "  - plan_id (BINARY(16)): Specific insurance plan",
                 "  - program_id (BINARY(16)): Care management program",
                 "  - start_date, end_date: Enrollment period",
-                "Join Path: patient -> map_patient_metrics -> lob -> organization"
+                "Join Path: patient -> map_patient_metrics -> lob -> organization",
             ],
-            
             "patient_score": [
                 "ANALYTICS/RISK SCORES TABLE",
                 "Purpose: Contains calculated risk scores and metrics for patients",
@@ -137,9 +131,8 @@ class SchemaRAG:
                 "  - calculation_time (DATETIME): When score was calculated",
                 "  - service_date_end (DATE): Data period end date",
                 "Join: patient.patient_id = patient_score.patient_id",
-                "Multiple rows per patient (historical scores) - use MAX(calculation_time) for latest"
+                "Multiple rows per patient (historical scores) - use MAX(calculation_time) for latest",
             ],
-            
             "organization": [
                 "MASTER ORGANIZATION TABLE",
                 "Purpose: Contains all healthcare organizations in the system",
@@ -149,9 +142,8 @@ class SchemaRAG:
                 "  - display_name (VARCHAR): Organization name",
                 "NEVER join directly to patient table",
                 "Must go through: patient -> map_patient_metrics -> lob -> organization",
-                "Join Path: lob.org_guid = organization.org_guid"
+                "Join Path: lob.org_guid = organization.org_guid",
             ],
-            
             "intervention_type": [
                 "INTERVENTION DEFINITIONS/CATALOG",
                 "Purpose: Dictionary of all intervention types (treatments, services, programs)",
@@ -162,9 +154,8 @@ class SchemaRAG:
                 "Columns:",
                 "  - intrv_type (INT): Primary key",
                 "  - label (VARCHAR): Human-readable intervention name",
-                "Join To: intervention_service.intrv_type = intervention_type.intrv_type"
+                "Join To: intervention_service.intrv_type = intervention_type.intrv_type",
             ],
-            
             "intervention_service": [
                 "INTERVENTION TRANSACTIONS/HISTORY",
                 "Purpose: Records of interventions actually delivered to patients",
@@ -173,9 +164,8 @@ class SchemaRAG:
                 "  - patient_id (BINARY(16))",
                 "  - intrv_type (INT): Links to intervention_type",
                 "  - service_date (DATE): When intervention was provided",
-                "Join Path: patient -> intervention_service -> intervention_type"
+                "Join Path: patient -> intervention_service -> intervention_type",
             ],
-            
             # ==================== QUERY PATTERN TAGS ====================
             "diagnosis_query_pattern": [
                 "",
@@ -209,9 +199,8 @@ class SchemaRAG:
                 "  WHERE ct.label LIKE '%Anxiety%' OR ct.label LIKE '%Depression%'",
                 "  LIMIT 10;",
                 "",
-                "DO NOT skip Step 1 - exact spelling matters!"
+                "DO NOT skip Step 1 - exact spelling matters!",
             ],
-            
             "insurance_query_pattern": [
                 "",
                 "╔════════════════════════════════════════════════════════════╗",
@@ -241,9 +230,8 @@ class SchemaRAG:
                 "  JOIN map_patient_metrics mpm ON p.patient_id = mpm.patient_id",
                 "  JOIN lob l ON mpm.lob_id = l.lob_id",
                 "  WHERE l.name LIKE '%Medicaid%'",
-                "  LIMIT 10;"
+                "  LIMIT 10;",
             ],
-            
             "organization_query_pattern": [
                 "",
                 "╔════════════════════════════════════════════════════════════╗",
@@ -273,9 +261,8 @@ class SchemaRAG:
                 "  JOIN lob l ON mpm.lob_id = l.lob_id",
                 "  JOIN organization o ON l.org_guid = o.org_guid",
                 "  WHERE o.org_id = 16",
-                "  LIMIT 10;"
+                "  LIMIT 10;",
             ],
-            
             "risk_score_query_pattern": [
                 "",
                 "╔════════════════════════════════════════════════════════════╗",
@@ -303,9 +290,8 @@ class SchemaRAG:
                 "    WHERE ps2.patient_id = ps.patient_id",
                 "  )",
                 "  ORDER BY ps.sdoh_score DESC",
-                "  LIMIT 5;"
+                "  LIMIT 5;",
             ],
-            
             "combined_diagnosis_org_pattern": [
                 "",
                 "╔════════════════════════════════════════════════════════════╗",
@@ -345,56 +331,37 @@ class SchemaRAG:
                 "",
                 "Note: contributor_type.org_id and organization.org_id are separate concepts!",
                 "  - contributor_type.org_id = who DEFINED the condition",
-                "  - Filter by organization.org_id = which org the PATIENT belongs to"
-            ]
+                "  - Filter by organization.org_id = which org the PATIENT belongs to",
+            ],
         }
 
         TABLE_TO_CONTEXTS = {
             "patient": [
-                "patient", 
-                "diagnosis_query_pattern", 
+                "patient",
+                "diagnosis_query_pattern",
                 "insurance_query_pattern",
                 "organization_query_pattern",
-                "risk_score_query_pattern"
+                "risk_score_query_pattern",
             ],
-            "contributor_type": [
-                "contributor_type", 
-                "diagnosis_query_pattern",
-                "combined_diagnosis_org_pattern"
-            ],
+            "contributor_type": ["contributor_type", "diagnosis_query_pattern", "combined_diagnosis_org_pattern"],
             "contributor_individual": [
-                "contributor_individual", 
+                "contributor_individual",
                 "diagnosis_query_pattern",
-                "combined_diagnosis_org_pattern"
+                "combined_diagnosis_org_pattern",
             ],
-            "lob": [
-                "lob", 
-                "insurance_query_pattern",
-                "organization_query_pattern"
-            ],
+            "lob": ["lob", "insurance_query_pattern", "organization_query_pattern"],
             "map_patient_metrics": [
-                "map_patient_metrics", 
+                "map_patient_metrics",
                 "insurance_query_pattern",
                 "organization_query_pattern",
-                "combined_diagnosis_org_pattern"
+                "combined_diagnosis_org_pattern",
             ],
-            "patient_score": [
-                "patient_score",
-                "risk_score_query_pattern"
-            ],
-            "organization": [
-                "organization",
-                "organization_query_pattern",
-                "combined_diagnosis_org_pattern"
-            ],
-            "intervention_type": [
-                "intervention_type"
-            ],
-            "intervention_service": [
-                "intervention_service"
-            ]
+            "patient_score": ["patient_score", "risk_score_query_pattern"],
+            "organization": ["organization", "organization_query_pattern", "combined_diagnosis_org_pattern"],
+            "intervention_type": ["intervention_type"],
+            "intervention_service": ["intervention_service"],
         }
-        
+
         for table in table_names:
             schema = self.db.get_table_info([table])
 
@@ -408,7 +375,7 @@ class SchemaRAG:
                 context_parts = [f"Standard table: {table} (no special context defined)"]
 
             final_context = "\n".join(context_parts)
-            
+
             content = f"""
     ═══════════════════════════════════════════════════════════════
     TABLE: {table}
@@ -422,12 +389,9 @@ class SchemaRAG:
     ───────────────────────────────────────────────────────────────
     {schema}
     """
-            
-            documents.append(Document(
-                page_content=content,
-                metadata={"table_name": table}
-            ))
-        
+
+            documents.append(Document(page_content=content, metadata={"table_name": table}))
+
         return documents
 
     def _build_index(self):
@@ -459,9 +423,9 @@ class SchemaRAG:
             return "Error: Vector store not initialized."
 
         results = self.vector_store.similarity_search(query, k=k)
-        
+
         output = []
         for doc in results:
             output.append(doc.page_content)
-            
+
         return "\n\n".join(output)

@@ -1,10 +1,8 @@
-import React from 'react';
 import ChatInterface from './components/ChatInterface';
-import './styles/App.css';
 
 function App() {
   return (
-    <div className="app">
+    <div className="w-full h-screen flex flex-col bg-white">
       <ChatInterface />
     </div>
   );

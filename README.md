@@ -1,81 +1,97 @@
-# Agentic SQL generator
-Designed as a Natural Language to SQL engine, to query complex healthcare datasets autonomously. Utilises a multi-agentic workflow, powered by AWS Bedrock (Google Gemini as a fallback client) and LangGraph to reason through database schemas and complex query generation.
+# CaliperLens
 
-Features a Schema Knowledge Graph for finding join paths between distant tables, and RAG system to map user jargon to technical table names.
+<img src="https://img.shields.io/badge/license-BUSL--1.1-blue" alt="License"/>
+<img src="https://img.shields.io/badge/version-2.0.0-green" alt="Version"/>
+<img src="https://img.shields.io/badge/python-3.12+-blue" alt="Python"/>
+<img src="https://img.shields.io/badge/typescript-5.4+-3178c6" alt="TypeScript"/>
+<img src="https://img.shields.io/badge/react-18.3-61dafb" alt="React"/>
+<img src="https://img.shields.io/badge/llm-gemini_3.5_flash-4285f4" alt="Gemini"/>
+<img src="https://img.shields.io/badge/CI-passing-brightgreen" alt="CI"/>
+
+An agentic natural-language-to-SQL engine for querying complex healthcare datasets autonomously. Uses a multi-agent workflow powered by Google Gemini 3.5 Flash and LangGraph to reason through database schemas and generate complex queries.
+
+Features a Schema Knowledge Graph for finding join paths between distant tables, and a RAG system to map user jargon to technical table names. All agent-generated code runs inside sandboxed Docker containers.
 
 ## Directory Overview
+
 ```
 backend/
-├── core/
-│   └── config.py          # Pydantic settings & env var loading
-├── schemas/
-│   └── chat.py            # API Request/Response models
+├── api/v1/                # Versioned route handlers
+│   └── router.py
 ├── src/
 │   ├── agent.py           # Main LangGraph Agent definition
-│   ├── custom_tools.py    # Tools exposed to the LLM (pathfinding, etc.)
+│   ├── custom_tools.py    # Tools exposed to the LLM
 │   ├── graph_manager.py   # NetworkX Logic for join path discovery
 │   ├── prompt_module.py   # System Prompts for different agent states
 │   └── rag_manager.py     # FAISS Vector Store for schema search
+├── schemas/
+│   └── chat.py            # API Request/Response models
 ├── utils/
+│   ├── config.py          # Pydantic settings
 │   ├── logger.py          # Custom logging configuration
 │   └── custom_exception.py
+├── tests/
+│   ├── test_api/          # API endpoint tests
+│   └── test_core/         # Core logic tests
 └── main.py                # FastAPI Entry point
-```
-## Critical Sticking Points that were resolved
-| Guardrail               | Description                                                                                                  |
-|-------------------------|--------------------------------------------------------------------------------------------------------------|
-| Binary UUID Protection  | The database uses BINARY(16). The Agent is trained (and forced via code validation) to wrap these in HEX() to prevent garbled output. |
-| Hallucination Check     | The graph_manager physically validates if two tables can be joined before the Agent is allowed to write the SQL. |
-| Syntax Correction       | If the Agent writes invalid SQL, the check_query_node catches it and auto-corrects common errors (like missing LIMIT). |
-| Data Verification       | The validate_answer_node checks if the result is empty or contains Python byte strings and triggers an automatic retry loop. |
-## Tools being used by Agent
-| Tool Name                       | Type                     | Key Responsibility                                                                                                     | When the Agent Uses It                                                                                                                                                 |
-|---------------------------------|---------------------------|-------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| sql_db_query                    | Execution                | Run SQL. Executes the final SQL query against the database to get actual data.                                         | **CRITICAL:** The final step of any successful workflow. The agent must call this to answer the user.                                                                 |
-| sql_db_find_relevant_tables     | Research (RAG)           | Search Schema. Uses vector search (FAISS) to find tables relevant to natural language terms (e.g., "insurance" → lob, map_patient_metrics). | Start of turn. When the user asks a question and the agent doesn't know which tables contain that data.                                                                |
-| sql_db_find_table_connections   | Reasoning (Graph)        | Solve Joins. Uses NetworkX/Dijkstra to calculate the shortest valid JOIN path between two or more tables.              | Planning Phase. When the agent knows it needs data from Table A and Table B but doesn't know the foreign keys connecting them.                                        |
-| sql_db_schema                   | Research                 | Get Metadata. Returns the CREATE TABLE statement, column names, and data types for specific tables.                    | Validation Phase. To check specific column names (e.g., is it dob or birth_date?) or types (e.g., is id an Integer or Binary?).                                        |
-| sql_db_query_distinct_values    | Research                 | Check Content. Selects distinct values from a column to understand formatting.                                         | Filtering Phase. When the user asks for "Active" patients, the agent checks if the status column uses "Active", "ACT", or "1".                                         |
-| sql_db_sample_rows              | Research                 | Preview Data. Returns the first 3 rows of a table.                                                                      | Exploration. When the agent wants to see what the data actually "looks like" before writing a complex query.                                                          |
-| sql_db_get_foreign_keys         | Reasoning                | Check Links. Lists the foreign keys defined for a specific table.                                                       | Backup Plan. If the Graph tool fails or the agent wants to verify a direct link manually.                                                                              |
-| sql_db_get_column_info          | Research                 | Deep Inspection. Detailed info on columns (often redundant with schema, but useful for type checking).                  | Type Safety. Specifically useful for checking if a column is BINARY(16) requiring HEX() conversion.                                                                    |
 
-## Instructions for using the repository
+frontend/
+├── src/
+│   ├── components/        # React components
+│   ├── store/             # Zustand state management
+│   ├── services/          # API call functions
+│   └── __tests__/         # Vitest component tests
+├── index.html
+├── vite.config.ts
+├── tsconfig.json
+└── package.json
+
+docs/
+├── problem.md             # Original problem statement
+├── design.md              # Architecture & design document
+└── features.json          # Feature tracker
 ```
-git clone https://github.com/Eros483/Caliper-SQL-generator.git
-cd Caliper-SQL-generator
+
+## Getting Started
+
+```bash
+git clone https://github.com/Eros483/CaliperLens.git
+cd CaliperLens
 cp .env.example .env
 ```
-- Set up env file accordingly.
-### Instructions on loading data from sql dump
-- Download sql dump data from relevant location.
-- The guide assumes the SQL file is named `Dump20250910.sql` and placed in the `data/raw` directory.
-```
-cd data/raw
-sudo apt update
-sudo apt install mysql-server mysql-client
-sudo systemctl start mysql
-sudo mysql_secure_installation
-sudo mysql
-CREATE USER 'host_name'@'localhost' IDENTIFIED BY 'your_password';
-GRANT ALL PRIVILEGES ON *.* TO 'host_name'@'localhost' WITH GRANT OPTION;
-FLUSH PRIVILEGES;
-mysql -u host_name -p < Dump20250910.sql
-mysql -u host_name -p -N -e \
-"SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA='fhs_coredb_local';"
 
+Set your `.env` with the required keys (see `.env.example`).
+
+```bash
+make setup    # Install all dependencies
+make dev      # Start frontend + backend
+make test     # Run all tests
+make style    # Format + lint
 ```
 
-### Instructions on loading backend
-```
-pip install -r requirements.txt
-python -m backend.main
-```
+## Tools
 
-### Instructions on loading frontend
-```
-cd frontend
-npm install
-npm run build
-npm run dev
-```
+| Tool | Type | Responsibility |
+|---|---|---|
+| sql_db_query | Execution | Execute SQL against the database |
+| sql_db_find_relevant_tables | Research (RAG) | Semantic vector search for table discovery |
+| sql_db_find_table_connections | Reasoning (Graph) | Dijkstra-based join pathfinding |
+| sql_db_schema | Research | Return CREATE TABLE DDL and column metadata |
+| sql_db_query_distinct_values | Research | Inspect unique values in a column |
+| sql_db_sample_rows | Research | Preview 3 rows from a table |
+| sql_db_get_foreign_keys | Reasoning | List explicitly defined foreign keys |
+| sql_db_get_column_info | Research | Detailed column type/comment inspection |
+
+## Guardrails
+
+| Guardrail | Description |
+|---|---|
+| Binary UUID Protection | Wraps BINARY(16) columns with HEX() / BIN_TO_UUID() |
+| Hallucination Check | Graph validates join paths before SQL generation |
+| Syntax Correction | Auto-adds LIMIT clauses, converts raw SQL to tool calls |
+| Data Verification | Detects binary garbage / empty results, triggers retry |
+| Org Scoping | Enforces organization-based row-level security |
+
+## License
+
+BUSL-1.1 — free for personal, educational, and portfolio use. Production or commercial deployment requires a separate license. See [LICENSE](LICENSE).

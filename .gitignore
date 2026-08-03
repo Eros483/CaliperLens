@@ -5,3 +5,20 @@ __pycache__/
 logs/
 .env
 node_modules/
+
+# Build
+dist/
+build/
+
+# Python
+.venv/
+.eggs/
+*.egg-info/
+.ruff_cache/
+.pytest_cache/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
