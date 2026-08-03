@@ -22,3 +22,9 @@ build/
 .vscode/
 *.swp
 *.swo
+
+graphify-out/cost.json
+graphify-out/cache/
+
+# OpenCode
+.opencode/node_modules/
