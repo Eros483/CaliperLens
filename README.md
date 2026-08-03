@@ -1,16 +1,23 @@
+<div align="center">
+
 # CaliperLens
+</center>
 
-<img src="https://img.shields.io/badge/license-BUSL--1.1-blue" alt="License"/>
-<img src="https://img.shields.io/badge/version-2.0.0-green" alt="Version"/>
-<img src="https://img.shields.io/badge/python-3.12+-blue" alt="Python"/>
-<img src="https://img.shields.io/badge/typescript-5.4+-3178c6" alt="TypeScript"/>
-<img src="https://img.shields.io/badge/react-18.3-61dafb" alt="React"/>
-<img src="https://img.shields.io/badge/llm-gemini_3.5_flash-4285f4" alt="Gemini"/>
-<img src="https://img.shields.io/badge/CI-passing-brightgreen" alt="CI"/>
+<center>
+<p>
+    <img src="https://img.shields.io/badge/license-BUSL--1.1-blue" alt="License"/>
+    <img src="https://img.shields.io/badge/version-2.0.0-green" alt="Version"/>
+    <img src="https://img.shields.io/badge/python-3.12+-blue" alt="Python"/>
+    <img src="https://img.shields.io/badge/typescript-5.4+-3178c6" alt="TypeScript"/>
+    <img src="https://img.shields.io/badge/react-18.3-61dafb" alt="React"/>
+    <img src="https://img.shields.io/badge/llm-gemini_3.5_flash-4285f4" alt="Gemini"/>
+    <img src="https://img.shields.io/badge/CI-passing-brightgreen" alt="CI"/>
+</p>
+</center>
 
-An agentic natural-language-to-SQL engine for querying complex healthcare datasets autonomously. Uses a multi-agent workflow powered by Google Gemini 3.5 Flash and LangGraph to reason through database schemas and generate complex queries.
+An agentic natural-language-to-SQL engine for querying complex healthcare datasets autonomously. Uses a multi-agent sandboxed workflow to reason through database schemas and generate complex queries.
 
-Features a Schema Knowledge Graph for finding join paths between distant tables, and a RAG system to map user jargon to technical table names. All agent-generated code runs inside sandboxed Docker containers.
+<div align="left">
 
 ## Directory Overview
 
