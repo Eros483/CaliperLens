@@ -132,7 +132,15 @@ dbt/
 
 **Airflow DAG:** A single DAG (caliperlens_pipeline) that runs dbt run on a schedule (daily or on-demand via make dbt-run). Uses the dbt-duckdb adapter. Airflow runs locally via docker-compose.airflow.yaml.
 
-**Agent impact:** The agent now queries DuckDB marts, not raw MySQL. The SchemaRAG context library is rebuilt against the dbt model documentation. This dramatically simplifies SQL generation (denormalized marts = fewer joins to reason about).
+**Agent impact:** The agent adopts a tiered query strategy that maximizes simplicity while retaining the graph-based pathfinder as a safety net for edge cases:
+
+**Tier 1 — Single mart (80% of queries):** The agent queries a single analytics mart directly. `fct_patient_metrics` already contains patient demographics, insurance, organization, and all risk scores in one row. Queries like "top 5 Medicaid patients by SDOH score" require zero joins — just WHERE, ORDER BY, LIMIT.
+
+**Tier 2 — Two-mart join on shared key (15%):** All marts share `patient_id`. A query like "intervention costs for high-SDOH patients" joins `fct_patient_metrics` and `fct_interventions` on `patient_id`. No pathfinding needed — the same column name exists on both sides. A simple foreign key dictionary replaces Dijkstra for this tier.
+
+**Tier 3 — Edge queries via staging fallback (5%):** A genuinely novel query that crosses tables not covered by the marts (e.g., filtering by a column that was deliberately excluded from the mart). The agent falls back to querying dbt staging models (1:1 mirrors of raw MySQL tables, materialized in DuckDB). The SchemaGraph (NetworkX) pathfinder still operates against these staging tables to discover join paths. The graph is preserved, not deleted — it is downgraded from the default path to a safety net.
+
+The SchemaRAG context library is rebuilt against dbt model documentation (auto-generated via `dbt docs generate` + manual medical terminology annotations). Both the mart descriptions and staging table descriptions are indexed, so the agent can discover whether a question is Tier 1/2 or needs Tier 3.
 
 **MySQL retention:** The MySQL source database is still loaded (raw dump). It serves as the immutable source of truth. All dbt transforms are idempotent and re-runnable.
 
@@ -186,11 +194,40 @@ Objective measurement of agent quality. Required before any agent behavior chang
 
 **Integration:** make eval runs the harness. CI runs it on every push via GitHub Actions.
 
-### Phase 6: Planner + Multi-turn Memory
+### Phase 6: Planner + Multi-turn Memory + RAG Preprocessing
 
-Upgrades the agent from single-shot query generation to multi-step workflow execution.
+Upgrades the agent from single-shot query generation to multi-step workflow execution, and moves RAG from a reactive LLM tool to a deterministic preprocessing step.
 
-**Planner node:** A new LangGraph node inserted before table discovery. Receives user question, generates an ordered execution plan:
+**RAG as preprocessing (graph simplification):**
+
+Currently the RAG is a tool the LLM must decide to call mid-graph — costing LLM roundtrips for "should I search for tables?", variable quality (the LLM chooses search terms), and an 8-node graph. This changes to a preprocessing step that runs once before the graph:
+
+```
+User query
+    → RAG search (deterministic, always runs): top-K relevant tables + schemas
+    → enriched prompt injected into initial state
+    → graph: generate_query → check_query → run_tools → validate_answer
+              ↑__________________________________________↓  (retry loop)
+                          → generate_final_answer → END
+```
+
+Benefits: 3 nodes eliminated (list_tables_node, call_get_schema_node, get_schema_node), zero LLM roundtrips spent on table discovery, the LLM gets schema context upfront like a human analyst, and RAG table discovery tools remain available as Tier-3 fallback tools but no longer gate the primary path.
+
+The enriched prompt includes: the user's original question, top-K relevant tables with column schemas, and the Tier-2 FK dictionary (patient_id shared across marts). Example:
+
+```
+User Question: show top 5 medicaid patients with highest SDOH score
+
+Relevant Tables:
+  fct_patient_metrics (patient_id, first_name, last_name, insurance_name,
+    sdoh_score, comprehensive_score, hcc_score, org_id, org_name)
+  dim_conditions (patient_id, condition_name, condition_category)
+
+Generate SQL to answer the question. Use LIMIT 10. Use HEX() for binary IDs.
+Filter by Organization ID if provided.
+```
+
+**Planner node:** A new LangGraph node inserted at the start of the graph. Receives the enriched prompt, generates an ordered execution plan:
 ```
 Plan: [
   { step: 1, action: "query", description: "Find top 5 Medicaid patients by SDOH score" },

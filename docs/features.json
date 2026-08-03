@@ -216,7 +216,7 @@
     {
       "id": "F004",
       "name": "Data Pipeline \u2014 dbt + DuckDB + Airflow",
-      "description": "Build a dbt project that transforms raw MySQL tables into analytics-ready DuckDB marts. Schedule via Airflow locally. Agent queries DuckDB, not raw MySQL.",
+      "description": "Build a dbt project that transforms raw MySQL tables into analytics-ready DuckDB marts. Schedule via Airflow locally. Agent queries DuckDB with tiered fallback strategy \u2014 marts for 95% of queries, SchemaGraph against staging models for edge cases.",
       "status": "planned",
       "priority": "high",
       "module": "dbt + airflow + backend",
@@ -264,26 +264,32 @@
         },
         {
           "id": "F004-8",
-          "name": "Update SchemaRAG context library to describe DuckDB marts",
+          "name": "Rebuild SchemaRAG: index dbt model docs (mart + staging descriptions), auto-generate from dbt docs + add medical terminology annotations",
           "status": "planned"
         },
         {
           "id": "F004-9",
-          "name": "Update SchemaGraph to reflect DuckDB mart schema (simpler joins)",
+          "name": "Create mart foreign key dictionary: map every mart to its shared keys (patient_id) for Tier 2 lookups",
           "status": "planned"
         },
         {
           "id": "F004-10",
+          "name": "Implement tiered fallback: agent first checks marts, falls back to SchemaGraph against staging models for edge queries",
+          "status": "planned",
+          "description": "Tier 1: single-mart query (zero joins). Tier 2: two-mart join on patient_id (no pathfinding). Tier 3: staging-model fallback using existing SchemaGraph for novel join paths."
+        },
+        {
+          "id": "F004-11",
           "name": "Add make dbt-run target",
           "status": "planned"
         },
         {
-          "id": "F004-11",
+          "id": "F004-12",
           "name": "Update .env.example with DuckDB path",
           "status": "planned"
         }
       ],
-      "notes": "MySQL source DB retained (immutable source of truth). dbt runs are idempotent. DuckDB file mounts read-only into sandbox. Agent query complexity drops significantly (queries marts, not raw tables).",
+      "notes": "MySQL source DB retained (immutable source of truth). dbt runs are idempotent. DuckDB file mounts read-only into sandbox. Tiered query strategy: Tier 1 single-mart (80%), Tier 2 two-mart join on patient_id (15%), Tier 3 SchemaGraph fallback against staging models (5%).",
       "added": "2026-08-02",
       "completed": null
     },
@@ -408,7 +414,7 @@
     {
       "id": "F007",
       "name": "Planner + Multi-turn Memory",
-      "description": "Add a planner node that decomposes complex questions into ordered multi-step plans. Track plan execution state. Re-plan on failure. Preserve conversation context across messages in a session.",
+      "description": "Move RAG to preprocessing (enrich prompt before graph entry), simplify graph from 8 nodes to 5, add planner node for multi-step workflows, enable conversation memory across messages in a session.",
       "status": "planned",
       "priority": "high",
       "module": "backend/core",
@@ -421,46 +427,62 @@
       "subtasks": [
         {
           "id": "F007-1",
-          "name": "Define plan Pydantic schema (steps with action type, description, status)",
+          "name": "Implement RAG preprocessing: run FAISS search deterministically before graph entry, inject enriched prompt with top-K tables + schemas",
           "status": "planned"
         },
         {
           "id": "F007-2",
-          "name": "Implement planner LangGraph node (generates ordered plan from user question)",
+          "name": "Simplify LangGraph: remove list_tables_node, call_get_schema_node, get_schema_node (RAG is now preprocessing, not a tool the LLM decides to call)",
           "status": "planned"
         },
         {
           "id": "F007-3",
-          "name": "Implement task-state tracking (plan_state dict with per-step pending/running/done/failed)",
-          "status": "planned"
+          "name": "Keep RAG table-discovery tools as Tier-3 fallback: sql_db_find_relevant_tables and sql_db_schema remain available for edge queries against staging models",
+          "status": "planned",
+          "description": "RAG preprocessing + graph simplification: full context, no discovery overhead."
         },
         {
           "id": "F007-4",
-          "name": "Implement conditional edge: on step failure, route back to planner with error context",
+          "name": "Define plan Pydantic schema (steps with action type, description, status)",
           "status": "planned"
         },
         {
           "id": "F007-5",
-          "name": "Update validate_answer_node to detect step-level failure (not just query failure)",
+          "name": "Implement planner LangGraph node (generates ordered plan from user question)",
           "status": "planned"
         },
         {
           "id": "F007-6",
-          "name": "Enable multi-turn memory (preserve chat history across messages in session)",
+          "name": "Implement task-state tracking (plan_state dict with per-step pending/running/done/failed)",
           "status": "planned"
         },
         {
           "id": "F007-7",
-          "name": "Update frontend to display plan progress (step counter, current step description)",
+          "name": "Implement conditional edge: on step failure, route back to planner with error context",
           "status": "planned"
         },
         {
           "id": "F007-8",
+          "name": "Update validate_answer_node to detect step-level failure (not just query failure)",
+          "status": "planned"
+        },
+        {
+          "id": "F007-9",
+          "name": "Enable multi-turn memory (preserve chat history across messages in session)",
+          "status": "planned"
+        },
+        {
+          "id": "F007-10",
+          "name": "Update frontend to display plan progress (step counter, current step description)",
+          "status": "planned"
+        },
+        {
+          "id": "F007-11",
           "name": "Add planning-related prompts to prompt_module.py",
           "status": "planned"
         }
       ],
-      "notes": "This is the biggest agent capability upgrade. The planner node sits before table discovery. Plans support step types: query, analyze, chart. Multi-turn memory leverages existing MemorySaver + session_id system.",
+      "notes": "RAG preprocessing runs deterministically before graph entry, eliminating 3 nodes and all table-discovery LLM roundtrips. Full context injected upfront. RAG tools retained as Tier-3 fallback. Planner builds on this enriched prompt. Multi-turn memory leverages existing MemorySaver + session_id system.",
       "added": "2026-08-02",
       "completed": null
     },
