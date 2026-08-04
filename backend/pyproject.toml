@@ -17,6 +17,7 @@ dependencies = [
     "langchain-core",
     "uvicorn",
     "pydantic-settings",
+    "docker",
 ]
 
 [project.optional-dependencies]

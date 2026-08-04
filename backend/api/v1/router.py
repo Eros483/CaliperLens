@@ -14,9 +14,8 @@ def get_agent():
 @router.get("/health", response_model=HealthResponse)
 async def health_check():
     agent = get_agent()
-    if agent:
-        return HealthResponse(status="healthy", agent="loaded")
-    return HealthResponse(status="unhealthy", agent="not loaded")
+    status = "healthy" if agent else "unhealthy"
+    return HealthResponse(status=status, agent="loaded" if agent else "not loaded")
 
 
 @router.post("/chat", response_model=ChatResponse)

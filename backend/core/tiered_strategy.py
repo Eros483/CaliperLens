@@ -95,19 +95,13 @@ def build_enriched_prompt(user_question: str, rag_result: str) -> str:
     schema_text = rag_result
 
     if tier == "tier_1_single_mart":
-        strategy = (
-            f"STRATEGY: Query only '{tables[0]}'. No joins needed. "
-            f"All columns are pre-joined in this table."
-        )
+        strategy = f"STRATEGY: Query only '{tables[0]}'. No joins needed. All columns are pre-joined in this table."
     elif tier == "tier_2_multi_mart":
         shared_keys = MART_SHARED_KEYS.get(tables[0], set())
         for t in tables[1:]:
             shared_keys = shared_keys & MART_SHARED_KEYS.get(t, set())
         join_on = ", ".join(shared_keys) if shared_keys else "patient_id"
-        strategy = (
-            f"STRATEGY: Join tables {tables} on {join_on}. "
-            f"Use simple JOIN on {join_on} = {join_on}."
-        )
+        strategy = f"STRATEGY: Join tables {tables} on {join_on}. Use simple JOIN on {join_on} = {join_on}."
     else:
         strategy = (
             "STRATEGY: Complex query. Use sql_db_find_table_connections "

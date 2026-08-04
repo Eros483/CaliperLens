@@ -333,7 +333,6 @@ class SchemaRAG:
                 "  - contributor_type.org_id = who DEFINED the condition",
                 "  - Filter by organization.org_id = which org the PATIENT belongs to",
             ],
-
             # Mart-level business context for Tier 1/2 (DuckDB analytics tables)
             "fct_patient_metrics": [
                 "MART: Patient Metrics Fact Table — PRIMARY TABLE FOR MOST QUERIES",
@@ -393,15 +392,14 @@ class SchemaRAG:
             ],
             "patient_score": ["patient_score", "risk_score_query_pattern"],
             "organization": ["organization", "organization_query_pattern", "combined_diagnosis_org_pattern"],
-        "intervention_type": ["intervention_type"],
-        "intervention_service": ["intervention_service"],
-
-        # Mart-level context for Tier 1/2 (analytics-ready DuckDB tables)
-        "fct_patient_metrics": ["fct_patient_metrics"],
-        "fct_interventions": ["fct_interventions"],
-        "dim_patients": ["dim_patients"],
-        "dim_conditions": ["dim_conditions"],
-    }
+            "intervention_type": ["intervention_type"],
+            "intervention_service": ["intervention_service"],
+            # Mart-level context for Tier 1/2 (analytics-ready DuckDB tables)
+            "fct_patient_metrics": ["fct_patient_metrics"],
+            "fct_interventions": ["fct_interventions"],
+            "dim_patients": ["dim_patients"],
+            "dim_conditions": ["dim_conditions"],
+        }
 
         for table in table_names:
             schema = self.db.get_table_info([table])

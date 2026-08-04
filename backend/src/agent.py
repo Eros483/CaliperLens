@@ -9,7 +9,7 @@ from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, START, MessagesState, StateGraph
 from langgraph.prebuilt import ToolNode
 
-from backend.src.custom_tools import get_db_tools
+from backend.src.custom_tools import get_db_tools, run_python_code_in_sandbox
 from backend.src.graph_manager import SchemaGraph
 from backend.src.prompt_module import (
     answer_validation_prompt_module,
@@ -60,7 +60,7 @@ class SQLAgentGenerator:
         toolkit = SQLDatabaseToolkit(db=self.db, llm=self.llm)
         standard_tools = toolkit.get_tools()
         custom_tools = get_db_tools(self.db, self.rag, self.graph_manager)
-        return standard_tools + custom_tools
+        return standard_tools + custom_tools + [run_python_code_in_sandbox]
 
     def list_tables_node(self, state: MessagesState):
         return {"messages": []}

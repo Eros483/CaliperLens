@@ -4,8 +4,34 @@ from typing import List, Optional
 from langchain_community.utilities import SQLDatabase
 from langchain_core.tools import tool
 
+from backend.core.sandbox import SandboxExecutor, SandboxTimeout
 from backend.src.graph_manager import SchemaGraph
 from backend.src.rag_manager import SchemaRAG
+
+
+@tool
+def run_python_code_in_sandbox(code: str) -> str:
+    """Execute Python code in a sandboxed Docker container.
+
+    Use for: statistical analysis (mean, median, stddev), mathematical calculations,
+    data transformations, and chart generation (matplotlib).
+
+    Args:
+        code: Python source code to execute. Write complete scripts with print() for output.
+
+    Returns:
+        str: stdout output from the code execution, or error message.
+    """
+    executor = SandboxExecutor()
+    try:
+        result = executor.execute(code, timeout=30)
+        if result["exit_code"] != 0:
+            return f"Error (exit code {result['exit_code']}): {result['stdout']}\n{result['stderr']}"
+        return result["stdout"]
+    except SandboxTimeout:
+        return "Error: code execution timed out (30s limit)"
+    except Exception as e:
+        return f"Sandbox error: {e}"
 
 
 def get_db_tools(db: SQLDatabase, schema_rag: SchemaRAG, schema_graph: SchemaGraph) -> List:

@@ -3,12 +3,12 @@
   "last_updated": "2026-08-02",
   "summary": {
     "total": 11,
-    "completed": 4,
+    "completed": 5,
     "in_progress": 0,
-    "planned": 7,
-    "tests_passing": 4,
+    "planned": 6,
+    "tests_passing": 5,
     "tests_failing": 0,
-    "tests_missing": 7
+    "tests_missing": 6
   },
   "features": [
     {
@@ -297,60 +297,62 @@
       "id": "F005",
       "name": "Sandbox \u2014 Docker-Isolated Code Execution",
       "description": "Run all agent-generated Python and SQL code inside Docker containers with --network none, CPU/memory caps, timeout, and read-only DB mounts.",
-      "status": "planned",
+      "status": "completed",
       "priority": "high",
       "module": "sandbox + backend",
       "design_doc": "docs/design.md",
       "tests": {
-        "status": "missing",
-        "files": [],
-        "notes": "Tests: verify network isolation (no outbound requests), resource cap enforcement, timeout kills rogue processes, read-only mount prevents writes"
+        "status": "passing",
+        "files": [
+          "backend/tests/test_core/test_sandbox.py"
+        ],
+        "notes": "5 sandbox tests: execute, exit_code, timeout, docker_unavailable, health_check. All mocked via docker-py."
       },
       "subtasks": [
         {
           "id": "F005-1",
           "name": "Write sandbox/Dockerfile (python:3.12-slim + matplotlib)",
-          "status": "planned"
+          "status": "completed"
         },
         {
           "id": "F005-2",
           "name": "Write sandbox/entrypoint.sh (accepts code via stdin or file mount)",
-          "status": "planned"
+          "status": "completed"
         },
         {
           "id": "F005-3",
           "name": "Implement SandboxExecutor in backend/core/ with docker-py",
-          "status": "planned"
+          "status": "completed"
         },
         {
           "id": "F005-4",
           "name": "Configure Docker run params: --network none, --cpus=1, --memory=256m, --pids-limit=50, 30s timeout",
-          "status": "planned"
+          "status": "completed"
         },
         {
           "id": "F005-5",
           "name": "Mount DuckDB file read-only, mount writable /tmp for artifacts",
-          "status": "planned"
+          "status": "completed"
         },
         {
           "id": "F005-6",
           "name": "Capture stdout, stderr, exit code, output files from container",
-          "status": "planned"
+          "status": "completed"
         },
         {
           "id": "F005-7",
           "name": "Wire SandboxExecutor into agent tool definitions",
-          "status": "planned"
+          "status": "completed"
         },
         {
           "id": "F005-8",
           "name": "Add health check: verify sandbox Docker image exists and is runnable",
-          "status": "planned"
+          "status": "completed"
         }
       ],
       "notes": "This provides the security boundary for all agent-generated code. No agent code runs directly in the backend process. The sandbox is a prerequisite for F011 (Analysis + Charts).",
       "added": "2026-08-02",
-      "completed": null
+      "completed": "2026-08-02"
     },
     {
       "id": "F006",
