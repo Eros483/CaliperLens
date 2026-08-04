@@ -23,8 +23,7 @@ build/
 *.swp
 *.swo
 
-graphify-out/cost.json
-graphify-out/cache/
+graphify-out/
 
 # OpenCode
 .opencode/node_modules/
