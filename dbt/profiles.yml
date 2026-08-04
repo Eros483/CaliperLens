@@ -1,0 +1,6 @@
+caliperlens:
+  outputs:
+    dev:
+      type: duckdb
+      path: "{{ env_var('DUCKDB_PATH', '../data/caliperlens.duckdb') }}"
+  target: dev

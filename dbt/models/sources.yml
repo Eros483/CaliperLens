@@ -1,0 +1,15 @@
+sources:
+  - name: mysql
+    database: mysql_source
+    schema: fhs_coredb_local
+    tables:
+      - name: patient
+      - name: lob
+      - name: map_patient_metrics
+      - name: patient_score
+      - name: contributor_type
+      - name: contributor_individual
+      - name: organization
+      - name: intervention_type
+      - name: intervention_service
+      - name: user

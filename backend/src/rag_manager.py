@@ -333,6 +333,41 @@ class SchemaRAG:
                 "  - contributor_type.org_id = who DEFINED the condition",
                 "  - Filter by organization.org_id = which org the PATIENT belongs to",
             ],
+
+            # Mart-level business context for Tier 1/2 (DuckDB analytics tables)
+            "fct_patient_metrics": [
+                "MART: Patient Metrics Fact Table — PRIMARY TABLE FOR MOST QUERIES",
+                "One row per patient. Pre-joined: demographics + insurance + organization + all risk scores.",
+                "Columns: patient_id, first_name, last_name, date_of_birth, sex, race, ethnicity,",
+                "  insurance_name (Medicaid/Medicare/Commercial), org_id, org_name,",
+                "  sdoh_score (Social Determinants of Health, 0-100), comprehensive_score,",
+                "  hcc_score, impactability_score, quality_score, latest_score_date",
+                "QUERY THIS FIRST. Zero joins needed for 80% of questions.",
+                "Filter: WHERE insurance_name = 'Medicaid'. Sort: ORDER BY sdoh_score DESC. Limit: LIMIT 10.",
+            ],
+            "fct_interventions": [
+                "MART: Intervention Transactions Fact Table",
+                "One row per patient-intervention event. Pre-joined to patient and insurance.",
+                "Columns: patient_id, first_name, last_name, insurance_name, org_id,",
+                "  intervention_name, service_date, cost_actual, intervention_expected_cost, intervention_outcome_cost",
+                "Filtered to last 2 years of data.",
+                "Tier 2 join: JOIN with fct_patient_metrics ON patient_id = patient_id for combined patient+intervention analysis.",
+            ],
+            "dim_patients": [
+                "MART: Patient Dimension Table",
+                "Slim version of fct_patient_metrics for listing and filtering.",
+                "Columns: patient_id, first_name, last_name, date_of_birth, sex, race, ethnicity,",
+                "  insurance_name, org_id, org_name",
+                "Use when you only need patient demographics without scores.",
+            ],
+            "dim_conditions": [
+                "MART: Patient Conditions Dimension Table",
+                "One row per patient-condition pair. Use for filtering by condition name or category.",
+                "Columns: patient_id, condition_name (e.g., 'Anxiety', 'Diabetes'),",
+                "  condition_category (Mental Health, Chronic Disease, SDOH), onset_date, resolution_date",
+                "Tier 2 join: JOIN with fct_patient_metrics ON patient_id = patient_id.",
+                "Use sql_db_find_value_location to verify condition spelling first.",
+            ],
         }
 
         TABLE_TO_CONTEXTS = {
@@ -358,9 +393,15 @@ class SchemaRAG:
             ],
             "patient_score": ["patient_score", "risk_score_query_pattern"],
             "organization": ["organization", "organization_query_pattern", "combined_diagnosis_org_pattern"],
-            "intervention_type": ["intervention_type"],
-            "intervention_service": ["intervention_service"],
-        }
+        "intervention_type": ["intervention_type"],
+        "intervention_service": ["intervention_service"],
+
+        # Mart-level context for Tier 1/2 (analytics-ready DuckDB tables)
+        "fct_patient_metrics": ["fct_patient_metrics"],
+        "fct_interventions": ["fct_interventions"],
+        "dim_patients": ["dim_patients"],
+        "dim_conditions": ["dim_conditions"],
+    }
 
         for table in table_names:
             schema = self.db.get_table_info([table])

@@ -1,0 +1,23 @@
+name: "caliperlens"
+version: "2.0.0"
+
+profile: "caliperlens"
+
+model-paths: ["models"]
+macro-paths: ["macros"]
+test-paths: ["tests"]
+
+on-run-start:
+  - "{{ attach_mysql() }}"
+
+models:
+  caliperlens:
+    staging:
+      +materialized: view
+      +schema: staging
+    intermediate:
+      +materialized: table
+      +schema: intermediate
+    marts:
+      +materialized: table
+      +schema: marts

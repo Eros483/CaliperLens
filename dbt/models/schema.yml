@@ -1,0 +1,55 @@
+version: 2
+
+models:
+  - name: fct_patient_metrics
+    description: "Analytics-ready patient fact table. One row per patient with demographics, insurance, organization, and all risk scores pre-joined. For 80% of user questions, querying this table alone is sufficient."
+    columns:
+      - name: patient_id
+        description: "BINARY(16) UUID"
+        tests:
+          - not_null
+          - unique
+      - name: sdoh_score
+        description: "Social Determinants of Health risk score (0-100 scale). Higher = more social risk factors."
+      - name: insurance_name
+        description: "Health insurance type — e.g., Medicaid, Medicare, Commercial"
+        tests:
+          - not_null
+
+  - name: fct_interventions
+    description: "Intervention transactions fact table. One row per patient-intervention event. Pre-joined to patient and insurance for cost analysis."
+    columns:
+      - name: patient_id
+        description: "BINARY(16) UUID"
+        tests:
+          - not_null
+          - relationships:
+              to: ref('fct_patient_metrics')
+              field: patient_id
+              config:
+                severity: warn
+      - name: cost_actual
+        description: "Actual cost of the intervention"
+      - name: service_date
+        description: "Date the intervention was delivered"
+
+  - name: dim_patients
+    description: "Patient dimension — slim version of fct_patient_metrics for listing/filtering. SCD Type 1 (current snapshot only)."
+    columns:
+      - name: patient_id
+        description: "BINARY(16) UUID"
+        tests:
+          - not_null
+          - unique
+
+  - name: dim_conditions
+    description: "Condition/diagnosis dimension. One row per patient-condition pair. Use for filtering by condition name or category."
+    columns:
+      - name: patient_id
+        description: "BINARY(16) UUID"
+        tests:
+          - not_null
+      - name: condition_name
+        description: "Human-readable condition — e.g., 'Anxiety', 'Diabetes'"
+      - name: condition_category
+        description: "Category — Mental Health, Chronic Disease, SDOH"

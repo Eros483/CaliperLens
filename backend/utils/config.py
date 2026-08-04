@@ -11,6 +11,8 @@ class Settings(BaseSettings):
     db_host: str = "localhost"
     db_name: str = "fhs_coredb_local"
 
+    duckdb_path: str = "./data/caliperlens.duckdb"
+
     gemini_api_key: str = ""
     langsmith_api_key: str = ""
     langchain_tracing_v2: bool = False

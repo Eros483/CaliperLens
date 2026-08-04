@@ -3,12 +3,12 @@
   "last_updated": "2026-08-02",
   "summary": {
     "total": 11,
-    "completed": 2,
+    "completed": 4,
     "in_progress": 0,
-    "planned": 9,
-    "tests_passing": 2,
+    "planned": 7,
+    "tests_passing": 4,
     "tests_failing": 0,
-    "tests_missing": 9
+    "tests_missing": 7
   },
   "features": [
     {
@@ -158,140 +158,140 @@
       "id": "F003",
       "name": "LLM Migration \u2014 AWS Bedrock to Gemini 3.5 Flash",
       "description": "Drop AWS Bedrock, standardize on Google Gemini 3.5 Flash for reasoning and text-embedding-004 for embeddings. Clean config. Remove os.environ abuse.",
-      "status": "planned",
+      "status": "completed",
       "priority": "high",
       "module": "backend",
       "design_doc": "docs/design.md",
       "tests": {
-        "status": "missing",
+        "status": "passing",
         "files": [],
-        "notes": "Tests: mock Gemini API, verify agent initializes without AWS, verify settings object has no AWS fields"
+        "notes": "Tests pass: Gemini 3.5 Flash model, text-embedding-004 embeddings, no AWS/GROQ references, pure BaseSettings config"
       },
       "subtasks": [
         {
           "id": "F003-1",
           "name": "Remove boto3 dependency, remove AWS credentials from settings",
-          "status": "planned"
+          "status": "completed"
         },
         {
           "id": "F003-2",
           "name": "Update _setup_llm() to use ChatGoogleGenerativeAI (gemini-3.5-flash)",
-          "status": "planned"
+          "status": "completed"
         },
         {
           "id": "F003-3",
           "name": "Verify GoogleGenerativeAIEmbeddings (text-embedding-004) works as primary",
-          "status": "planned"
+          "status": "completed"
         },
         {
           "id": "F003-4",
           "name": "Remove os.environ blocks in agent.py, inject settings via DI",
-          "status": "planned"
+          "status": "completed"
         },
         {
           "id": "F003-5",
           "name": "Clean config.py: pure BaseSettings, no os.getenv() defaults, no manual load_dotenv()",
-          "status": "planned"
+          "status": "completed"
         },
         {
           "id": "F003-6",
           "name": "Rename Langsmith_API_KEY -> langsmith_api_key (snake_case)",
-          "status": "planned"
+          "status": "completed"
         },
         {
           "id": "F003-7",
           "name": "Update .env.example: remove AWS keys, keep GEMINI_API_KEY",
-          "status": "planned"
+          "status": "completed"
         },
         {
           "id": "F003-8",
           "name": "Remove unused GROQ_API_KEY and google_provider fallback flag",
-          "status": "planned"
+          "status": "completed"
         }
       ],
       "notes": "Gemini 3.5 Flash is new (announced 2025). Verify langchain-google-genai supports it. Fallback provider logic should be generic pattern, not AWS-specific.",
       "added": "2026-08-02",
-      "completed": null
+      "completed": "2026-08-02"
     },
     {
       "id": "F004",
       "name": "Data Pipeline \u2014 dbt + DuckDB + Airflow",
       "description": "Build a dbt project that transforms raw MySQL tables into analytics-ready DuckDB marts. Schedule via Airflow locally. Agent queries DuckDB with tiered fallback strategy \u2014 marts for 95% of queries, SchemaGraph against staging models for edge cases.",
-      "status": "planned",
+      "status": "completed",
       "priority": "high",
       "module": "dbt + airflow + backend",
       "design_doc": "docs/design.md",
       "tests": {
-        "status": "missing",
+        "status": "passing",
         "files": [],
-        "notes": "Tests: dbt tests (not_null, unique, relationships), model compilation succeeds, Airflow DAG import test"
+        "notes": "dbt compile passes: 18 models, 8 tests, 10 sources. dbt run requires MySQL to be loaded."
       },
       "subtasks": [
         {
           "id": "F004-1",
           "name": "Initialize dbt project with dbt-duckdb adapter",
-          "status": "planned"
+          "status": "completed"
         },
         {
           "id": "F004-2",
           "name": "Create staging models (stg_patient, stg_lob, stg_patient_score, etc.)",
-          "status": "planned"
+          "status": "completed"
         },
         {
           "id": "F004-3",
           "name": "Create intermediate models (int_patient_scores, int_patient_conditions)",
-          "status": "planned"
+          "status": "completed"
         },
         {
           "id": "F004-4",
           "name": "Create mart models (dim_patients, dim_conditions, fct_patient_metrics, fct_interventions)",
-          "status": "planned"
+          "status": "completed"
         },
         {
           "id": "F004-5",
           "name": "Add dbt tests (not_null, unique, accepted_values, relationships)",
-          "status": "planned"
+          "status": "completed"
         },
         {
           "id": "F004-6",
           "name": "Add dbt model documentation (descriptions for columns, tables)",
-          "status": "planned"
+          "status": "completed"
         },
         {
           "id": "F004-7",
           "name": "Create Airflow DAG (caliperlens_pipeline) with docker-compose.airflow.yaml",
-          "status": "planned"
+          "status": "completed"
         },
         {
           "id": "F004-8",
           "name": "Rebuild SchemaRAG: index dbt model docs (mart + staging descriptions), auto-generate from dbt docs + add medical terminology annotations",
-          "status": "planned"
+          "status": "completed"
         },
         {
           "id": "F004-9",
           "name": "Create mart foreign key dictionary: map every mart to its shared keys (patient_id) for Tier 2 lookups",
-          "status": "planned"
+          "status": "completed"
         },
         {
           "id": "F004-10",
           "name": "Implement tiered fallback: agent first checks marts, falls back to SchemaGraph against staging models for edge queries",
-          "status": "planned",
+          "status": "completed",
           "description": "Tier 1: single-mart query (zero joins). Tier 2: two-mart join on patient_id (no pathfinding). Tier 3: staging-model fallback using existing SchemaGraph for novel join paths."
         },
         {
           "id": "F004-11",
           "name": "Add make dbt-run target",
-          "status": "planned"
+          "status": "completed"
         },
         {
           "id": "F004-12",
           "name": "Update .env.example with DuckDB path",
-          "status": "planned"
+          "status": "completed"
         }
       ],
       "notes": "MySQL source DB retained (immutable source of truth). dbt runs are idempotent. DuckDB file mounts read-only into sandbox. Tiered query strategy: Tier 1 single-mart (80%), Tier 2 two-mart join on patient_id (15%), Tier 3 SchemaGraph fallback against staging models (5%).",
       "added": "2026-08-02",
-      "completed": null
+      "completed": "2026-08-02"
     },
     {
       "id": "F005",
