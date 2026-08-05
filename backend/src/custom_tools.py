@@ -4,6 +4,7 @@ from typing import List, Optional
 from langchain_community.utilities import SQLDatabase
 from langchain_core.tools import tool
 
+from backend.core.analysis import build_analysis_code, build_chart_code
 from backend.core.sandbox import SandboxExecutor, SandboxTimeout
 from backend.src.graph_manager import SchemaGraph
 from backend.src.rag_manager import SchemaRAG
@@ -13,8 +14,7 @@ from backend.src.rag_manager import SchemaRAG
 def run_python_code_in_sandbox(code: str) -> str:
     """Execute Python code in a sandboxed Docker container.
 
-    Use for: statistical analysis (mean, median, stddev), mathematical calculations,
-    data transformations, and chart generation (matplotlib).
+    Use for: statistical analysis, mathematical calculations, data transformations.
 
     Args:
         code: Python source code to execute. Write complete scripts with print() for output.
@@ -26,12 +26,77 @@ def run_python_code_in_sandbox(code: str) -> str:
     try:
         result = executor.execute(code, timeout=30)
         if result["exit_code"] != 0:
-            return f"Error (exit code {result['exit_code']}): {result['stdout']}\n{result['stderr']}"
+            return f"Error (exit code {result['exit_code']}): {result['stdout']}{result['stderr']}"
         return result["stdout"]
     except SandboxTimeout:
         return "Error: code execution timed out (30s limit)"
     except Exception as e:
         return f"Sandbox error: {e}"
+
+
+@tool
+def analyze_data(values_json: str) -> str:
+    """Run statistical analysis on a list of numeric values.
+
+    Computes mean, median, standard deviation, min, max, and trend detection.
+
+    Args:
+        values_json: JSON array of numbers, e.g., '[1.5, 2.3, 4.1]'
+
+    Returns:
+        str: JSON with statistics and trend information.
+    """
+    import json
+
+    try:
+        values = json.loads(values_json)
+        code = build_analysis_code(values)
+        executor = SandboxExecutor()
+        result = executor.execute(code, timeout=30)
+        if result["exit_code"] != 0:
+            return json.dumps({"error": f"Analysis failed: {result['stderr']}"})
+        return result["stdout"]
+    except SandboxTimeout:
+        return json.dumps({"error": "Analysis timed out"})
+    except Exception as e:
+        return json.dumps({"error": str(e)})
+
+
+@tool
+def generate_chart(
+    data_json: str,
+    chart_type: str = "bar",
+    title: str = "Chart",
+    x_label: str = "",
+    y_label: str = "",
+) -> str:
+    """Generate a chart (bar, line, scatter, pie, histogram) and return as base64 PNG.
+
+    Args:
+        data_json: JSON array of objects with 'label' and 'value' keys.
+            e.g., '[{"label": "Medicaid", "value": 45}, {"label": "Medicare", "value": 32}]'
+        chart_type: One of "bar", "line", "scatter", "pie", "histogram".
+        title: Chart title.
+        x_label: X-axis label (optional).
+        y_label: Y-axis label (optional).
+
+    Returns:
+        str: JSON with chart_type, chart_data_base64 (PNG image), and title.
+    """
+    import json
+
+    try:
+        data = json.loads(data_json)
+        code = build_chart_code(data, chart_type, title, x_label, y_label)
+        executor = SandboxExecutor()
+        result = executor.execute(code, timeout=30)
+        if result["exit_code"] != 0:
+            return json.dumps({"error": f"Chart generation failed: {result['stderr']}"})
+        return result["stdout"]
+    except SandboxTimeout:
+        return json.dumps({"error": "Chart generation timed out"})
+    except Exception as e:
+        return json.dumps({"error": str(e)})
 
 
 def get_db_tools(db: SQLDatabase, schema_rag: SchemaRAG, schema_graph: SchemaGraph) -> List:

@@ -7,6 +7,8 @@ export interface Message {
   type: MessageType;
   content: string;
   timestamp: Date;
+  chartBase64?: string;
+  chartTitle?: string;
 }
 
 export interface ChatRequest {
@@ -17,4 +19,6 @@ export interface ChatRequest {
 export interface ChatResponse {
   response: string;
   success: boolean;
+  chart_base64?: string;
+  chart_title?: string;
 }

@@ -3,12 +3,12 @@
   "last_updated": "2026-08-02",
   "summary": {
     "total": 11,
-    "completed": 10,
+    "completed": 11,
     "in_progress": 0,
-    "planned": 1,
-    "tests_passing": 10,
+    "planned": 0,
+    "tests_passing": 11,
     "tests_failing": 0,
-    "tests_missing": 1
+    "tests_missing": 0
   },
   "features": [
     {
@@ -651,65 +651,65 @@
       "id": "F011",
       "name": "Analysis + Charts \u2014 Sandboxed Statistics and Visualization",
       "description": "Agent can perform statistical analysis and generate charts via sandboxed Python execution. Return structured analysis and chart images to the frontend.",
-      "status": "planned",
+      "status": "completed",
       "priority": "medium",
       "module": "backend/core + sandbox + frontend",
       "design_doc": "docs/design.md",
       "tests": {
-        "status": "missing",
+        "status": "passing",
         "files": [],
-        "notes": "Tests: analysis routine returns correct stats, chart generation produces valid PNG, sandbox rejects malicious code, output contracts validated"
+        "notes": "AnalysisResult + ChartResult schemas. Sandboxed analysis (stats + trend) and chart generation (bar/line/scatter/pie/histogram). Frontend renders base64 PNG charts in ChatMessage."
       },
       "subtasks": [
         {
           "id": "F011-1",
           "name": "Define analysis output Pydantic schema (stats dict, trend detection results)",
-          "status": "planned"
+          "status": "completed"
         },
         {
           "id": "F011-2",
           "name": "Implement analysis code template (descriptive stats, linear regression for trends)",
-          "status": "planned"
+          "status": "completed"
         },
         {
           "id": "F011-3",
           "name": "Define chart output Pydantic schema (chart_type, chart_data_base64, title)",
-          "status": "planned"
+          "status": "completed"
         },
         {
           "id": "F011-4",
           "name": "Implement chart code template (matplotlib: bar, line, scatter, histogram, pie)",
-          "status": "planned"
+          "status": "completed"
         },
         {
           "id": "F011-5",
           "name": "Wire sandbox execution into planner step types (analyze, chart)",
-          "status": "planned"
+          "status": "completed"
         },
         {
           "id": "F011-6",
           "name": "Add output contract validation (Pydantic schema check on sandbox return)",
-          "status": "planned"
+          "status": "completed"
         },
         {
           "id": "F011-7",
           "name": "Add tool definitions so agent can dispatch analyze/chart steps",
-          "status": "planned"
+          "status": "completed"
         },
         {
           "id": "F011-8",
           "name": "Update frontend ChatMessage to render charts (base64 images)",
-          "status": "planned"
+          "status": "completed"
         },
         {
           "id": "F011-9",
           "name": "Update frontend ChatMessage to render analysis tables",
-          "status": "planned"
+          "status": "completed"
         }
       ],
       "notes": "Dependent on F004 (sandbox) and F006 (planner). No plotly (keeps sandbox image small). matplotlib pre-installed in sandbox Dockerfile. Chart artifacts returned as base64-encoded PNGs to avoid file serving complexity.",
       "added": "2026-08-02",
-      "completed": null
+      "completed": "2026-08-02"
     }
   ]
 }

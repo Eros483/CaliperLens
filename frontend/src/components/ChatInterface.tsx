@@ -59,11 +59,24 @@ function ChatInterface() {
 
     try {
       const response = await sendMessage(text, sessionId);
+      let chartBase64: string | undefined;
+      let chartTitle: string | undefined;
+      try {
+        const parsed = JSON.parse(response.response);
+        if (parsed.chart_data_base64) {
+          chartBase64 = parsed.chart_data_base64;
+          chartTitle = parsed.title;
+        }
+      } catch {
+        /* response is not JSON, no chart */
+      }
       addMessage({
         id: Date.now() + 1,
         type: 'ai',
         content: response.response,
         timestamp: new Date(),
+        chartBase64,
+        chartTitle,
       });
     } catch (error) {
       addMessage({

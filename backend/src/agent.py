@@ -11,7 +11,7 @@ from langgraph.prebuilt import ToolNode
 
 from backend.core.planner import Plan, PlanStep, planner_system_prompt
 from backend.core.tiered_strategy import build_enriched_prompt
-from backend.src.custom_tools import get_db_tools, run_python_code_in_sandbox
+from backend.src.custom_tools import analyze_data, generate_chart, get_db_tools, run_python_code_in_sandbox
 from backend.src.graph_manager import SchemaGraph
 from backend.src.prompt_module import (
     answer_validation_prompt_module,
@@ -64,7 +64,7 @@ class SQLAgentGenerator:
         toolkit = SQLDatabaseToolkit(db=self.db, llm=self.llm)
         standard_tools = toolkit.get_tools()
         custom_tools = get_db_tools(self.db, self.rag, self.graph_manager)
-        return standard_tools + custom_tools + [run_python_code_in_sandbox]
+        return standard_tools + custom_tools + [run_python_code_in_sandbox, analyze_data, generate_chart]
 
     def _preprocess(self, question: str) -> str:
         rag_result = self.rag.search_tables(question)

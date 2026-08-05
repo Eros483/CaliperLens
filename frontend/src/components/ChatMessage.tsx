@@ -23,7 +23,19 @@ function ChatMessage({ message }: ChatMessageProps) {
       >
         {avatarEmoji}
       </div>
-      <div className="flex flex-col gap-1 max-w-full">
+      <div className="flex flex-col gap-2 max-w-full">
+        {message.chartBase64 && (
+          <div className="rounded-lg overflow-hidden border border-slate-200 bg-white p-2">
+            {message.chartTitle && (
+              <p className="text-xs font-medium text-slate-500 mb-1 px-1">{message.chartTitle}</p>
+            )}
+            <img
+              src={`data:image/png;base64,${message.chartBase64}`}
+              alt={message.chartTitle ?? 'Chart'}
+              className="max-w-full rounded"
+            />
+          </div>
+        )}
         <div
           className={`px-4 py-3 rounded-lg text-sm leading-relaxed border whitespace-pre-wrap break-words ${
             message.type === 'user'
