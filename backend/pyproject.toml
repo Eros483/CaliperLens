@@ -18,6 +18,9 @@ dependencies = [
     "uvicorn",
     "pydantic-settings",
     "docker",
+    "python-jose[cryptography]>=3.5.0",
+    "passlib[bcrypt]>=1.7.4",
+    "slowapi>=0.1.10",
 ]
 
 [project.optional-dependencies]

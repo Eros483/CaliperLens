@@ -19,6 +19,9 @@ class Settings(BaseSettings):
 
     secret_key: str = "change-me-secret-key"
 
+    demo_user: str = ""
+    demo_password_hash: str = ""
+
     @property
     def database_uri(self) -> str:
         from urllib.parse import quote_plus

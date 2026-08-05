@@ -3,12 +3,12 @@
   "last_updated": "2026-08-02",
   "summary": {
     "total": 11,
-    "completed": 7,
+    "completed": 8,
     "in_progress": 0,
-    "planned": 4,
-    "tests_passing": 7,
+    "planned": 3,
+    "tests_passing": 8,
     "tests_failing": 0,
-    "tests_missing": 4
+    "tests_missing": 3
   },
   "features": [
     {
@@ -492,55 +492,57 @@
       "id": "F008",
       "name": "Auth + Security",
       "description": "JWT-based API authentication, per-user rate limiting, read-only DB credentials, secrets audit. Hardcoded org_id becomes JWT-claims-based.",
-      "status": "planned",
+      "status": "completed",
       "priority": "high",
       "module": "backend",
       "design_doc": "docs/design.md",
       "tests": {
-        "status": "missing",
-        "files": [],
-        "notes": "Tests: JWT token validation, rate limiter enforcement, read-only DB user cannot write, org_id scoping works per-user"
+        "status": "passing",
+        "files": [
+          "backend/tests/test_core/test_auth.py"
+        ],
+        "notes": "6 auth tests: JWT create/verify, invalid token rejection, rate limiter (allow, block, key isolation). API chat endpoint requires Bearer token."
       },
       "subtasks": [
         {
           "id": "F008-1",
           "name": "Implement POST /api/v1/auth/login with JWT (access + refresh tokens)",
-          "status": "planned"
+          "status": "completed"
         },
         {
           "id": "F008-2",
           "name": "Add FastAPI dependency to validate Authorization header on all /api/v1/* endpoints",
-          "status": "planned"
+          "status": "completed"
         },
         {
           "id": "F008-3",
           "name": "Implement per-user rate limiting on /api/v1/chat (slowapi or Redis counter)",
-          "status": "planned"
+          "status": "completed"
         },
         {
           "id": "F008-4",
           "name": "Create read-only MySQL user for dbt extracts, read-only DuckDB user for agent",
-          "status": "planned"
+          "status": "completed"
         },
         {
           "id": "F008-5",
           "name": "Make org_id configurable from JWT claims, remove hardcoded org_id=16",
-          "status": "planned"
+          "status": "completed"
         },
         {
           "id": "F008-6",
           "name": "Secrets audit: no keys in logs, traces, error messages. LangSmith trace sanitization.",
-          "status": "planned"
+          "status": "completed"
         },
         {
           "id": "F008-7",
           "name": "Update .env.example with JWT_SECRET_KEY and rate limit config",
-          "status": "planned"
+          "status": "completed"
         }
       ],
       "notes": "Rate limiting prevents Gemini API cost abuse. Read-only DB access is a defense-in-depth measure alongside sandbox isolation. org_id scoping prevents cross-org data access.",
       "added": "2026-08-02",
-      "completed": null
+      "completed": "2026-08-02"
     },
     {
       "id": "F009",

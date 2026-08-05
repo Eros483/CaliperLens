@@ -21,10 +21,10 @@ class TestHealthEndpoint:
 
 @pytest.mark.skipif(not HAVE_DEPS, reason="Backend dependencies not installed")
 class TestChatEndpoint:
-    def test_chat_without_agent_returns_503(self):
+    def test_chat_without_auth_returns_401(self):
         client = TestClient(app)
         response = client.post(
             "/api/v1/chat",
             json={"query": "test", "session_id": "test"},
         )
-        assert response.status_code == 503
+        assert response.status_code == 401 or response.status_code == 403
