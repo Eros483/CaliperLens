@@ -30,7 +30,9 @@ def get_agent():
 @router.get("/health", response_model=HealthResponse)
 async def health_check():
     agent = get_agent()
-    return HealthResponse(status="healthy" if agent else "unhealthy", agent="loaded" if agent else "not loaded")
+    agent_status = "loaded" if agent else "not loaded"
+    overall = "healthy" if agent else "unhealthy"
+    return HealthResponse(status=overall, agent=agent_status)
 
 
 @router.post("/auth/login", response_model=TokenResponse)

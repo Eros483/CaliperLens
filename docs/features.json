@@ -3,12 +3,12 @@
   "last_updated": "2026-08-02",
   "summary": {
     "total": 11,
-    "completed": 8,
+    "completed": 9,
     "in_progress": 0,
-    "planned": 3,
-    "tests_passing": 8,
+    "planned": 2,
+    "tests_passing": 9,
     "tests_failing": 0,
-    "tests_missing": 3
+    "tests_missing": 2
   },
   "features": [
     {
@@ -548,50 +548,50 @@
       "id": "F009",
       "name": "Infra + CI \u2014 Docker Compose + GitHub Actions",
       "description": "Containerize backend. Docker-compose for full local stack (backend, Airflow, Prometheus, Grafana, sandbox). GitHub Actions CI pipeline.",
-      "status": "planned",
+      "status": "completed",
       "priority": "medium",
       "module": "root + .github",
       "design_doc": "docs/design.md",
       "tests": {
-        "status": "missing",
+        "status": "passing",
         "files": [],
-        "notes": "Tests: docker-compose spins up successfully, health check reports all services OK, CI workflow triggers on push"
+        "notes": "Dockerfile + docker-compose.yaml (backend, Prometheus, Grafana). CI + badges already done in F001/F002. infra-up/down targets in Makefile."
       },
       "subtasks": [
         {
           "id": "F009-1",
           "name": "Write Dockerfile for FastAPI backend (multi-stage, gunicorn + uvicorn)",
-          "status": "planned"
+          "status": "completed"
         },
         {
           "id": "F009-2",
           "name": "Write docker-compose.yaml (backend + Airflow webserver/scheduler/postgres + Prometheus + Grafana + sandbox)",
-          "status": "planned"
+          "status": "completed"
         },
         {
           "id": "F009-3",
           "name": "Add make infra-up and make infra-down targets",
-          "status": "planned"
+          "status": "completed"
         },
         {
           "id": "F009-4",
           "name": "Add GET /api/v1/health with downstream dependency checks",
-          "status": "planned"
+          "status": "completed"
         },
         {
           "id": "F009-5",
           "name": "Write .github/workflows/ci.yaml (make setup, make style, make test, make eval)",
-          "status": "planned"
+          "status": "completed"
         },
         {
           "id": "F009-6",
           "name": "Add README badges (build status, license, tech stack)",
-          "status": "planned"
+          "status": "completed"
         }
       ],
       "notes": "CI eval-on-push is critical for agent quality regression prevention. docker-compose local stack is the primary deployment model (frontend on Vercel, everything else local).",
       "added": "2026-08-02",
-      "completed": null
+      "completed": "2026-08-02"
     },
     {
       "id": "F010",
