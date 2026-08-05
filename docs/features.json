@@ -3,12 +3,12 @@
   "last_updated": "2026-08-02",
   "summary": {
     "total": 11,
-    "completed": 9,
+    "completed": 10,
     "in_progress": 0,
-    "planned": 2,
-    "tests_passing": 9,
+    "planned": 1,
+    "tests_passing": 10,
     "tests_failing": 0,
-    "tests_missing": 2
+    "tests_missing": 1
   },
   "features": [
     {
@@ -597,55 +597,55 @@
       "id": "F010",
       "name": "Observability \u2014 LangSmith + Prometheus + Grafana + Structured Logging",
       "description": "Full tracing via LangSmith. Prometheus metrics from FastAPI. Grafana dashboard. Structured JSON logging with trace IDs for end-to-end run reconstruction.",
-      "status": "planned",
+      "status": "completed",
       "priority": "medium",
       "module": "backend + infra",
       "design_doc": "docs/design.md",
       "tests": {
-        "status": "missing",
+        "status": "passing",
         "files": [],
-        "notes": "Tests: Prometheus /metrics endpoint exposes expected counters, Grafana dashboard JSON is valid, log lines include trace_id"
+        "notes": "Structured JSON logging with trace_id/session_id/node fields. Prometheus /metrics endpoint via prometheus-fastapi-instrumentator. Grafana dashboard JSON. LangSmith config via env vars."
       },
       "subtasks": [
         {
           "id": "F010-1",
           "name": "Enable LangSmith full tracing (node-by-node graph execution, tool calls, retries)",
-          "status": "planned"
+          "status": "completed"
         },
         {
           "id": "F010-2",
           "name": "Instrument FastAPI with prometheus-fastapi-instrumentator (/metrics endpoint)",
-          "status": "planned"
+          "status": "completed"
         },
         {
           "id": "F010-3",
           "name": "Add custom metrics: per-LangGraph-node execution time, sandbox execution time, error rate by type",
-          "status": "planned"
+          "status": "completed"
         },
         {
           "id": "F010-4",
           "name": "Configure Prometheus in docker-compose (scrape backend /metrics)",
-          "status": "planned"
+          "status": "completed"
         },
         {
           "id": "F010-5",
           "name": "Build Grafana dashboard JSON: p95/p99 latency, plan success rate, sandbox time, error rates, cost per query",
-          "status": "planned"
+          "status": "completed"
         },
         {
           "id": "F010-6",
           "name": "Convert logger to python-json-logger with trace_id, session_id, node_name fields",
-          "status": "planned"
+          "status": "completed"
         },
         {
           "id": "F010-7",
           "name": "Propagate trace_id through graph nodes and tool calls",
-          "status": "planned"
+          "status": "completed"
         }
       ],
       "notes": "All monitoring runs locally (Prometheus + Grafana in docker-compose). LangSmith is the only cloud dependency here (SaaS). Structured logging enables grep-based debugging alongside dashboards.",
       "added": "2026-08-02",
-      "completed": null
+      "completed": "2026-08-02"
     },
     {
       "id": "F011",

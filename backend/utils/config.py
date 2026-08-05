@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     gemini_api_key: str = ""
     langsmith_api_key: str = ""
     langchain_tracing_v2: bool = False
+    langchain_project: str = "caliperlens"
 
     secret_key: str = "change-me-secret-key"
 

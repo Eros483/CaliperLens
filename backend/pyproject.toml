@@ -21,6 +21,8 @@ dependencies = [
     "python-jose[cryptography]>=3.5.0",
     "passlib[bcrypt]>=1.7.4",
     "slowapi>=0.1.10",
+    "prometheus-fastapi-instrumentator>=8.1.0",
+    "python-json-logger>=4.1.0",
 ]
 
 [project.optional-dependencies]
