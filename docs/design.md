@@ -1,330 +1,277 @@
-# CaliperLens — Design Document
+# CaliperLens — Design & Architecture
 
-## 1. Overview
+## Overview
 
-CaliperLens is a local-first, agentic natural-language-to-SQL engine for querying complex healthcare datasets. Users type plain-English questions ("top 5 Medicaid patients with highest SDOH score, chart their intervention costs") and the system autonomously plans multi-step workflows, generates and executes SQL, performs statistical analysis, and produces charts — all inside sandboxed Docker containers.
+CaliperLens is an agentic natural-language-to-SQL engine for healthcare datasets. A user types a plain-English question ("top 5 Medicaid patients by highest SDOH score, chart their costs") and the system autonomously discovers relevant tables via semantic search, generates validated SQL, executes it inside a sandbox, optionally performs statistical analysis and produces charts, and returns a natural-language answer with embedded visuals.
 
-The system runs entirely locally. Only the frontend is deployed (Vercel), displaying a notice that the backend is not publicly connected. Real patient data stays on the developer's machine.
+The stack runs entirely locally (Docker). Only the frontend is deployed to Vercel as a static shell with a HIPAA compliance notice. Patient data never leaves the developer's machine.
 
-## 2. Architecture
+---
 
-```
-┌──────────────┐     ┌──────────────────────────────────────────────────┐
-│   Frontend   │     │               Local Docker Host                    │
-│  (Vercel)    │     │                                                  │
-│  React+TS    │     │  ┌──────────┐  ┌──────────┐  ┌───────────────┐  │
-│  Tailwind v4 │     │  │ FastAPI   │  │ Airflow  │  │  Prometheus   │  │
-│  Zustand     │     │  │ Backend   │  │ (dbt)    │  │  + Grafana    │  │
-│              │     │  │           │  │          │  │               │  │
-│  "not public │     │  │ /api/v1/  │  │ DAG ->   │  │  metrics +    │  │
-│   yet" banner│     │  │  chat     │  │ dbt run  │  │  dashboards   │  │
-└──────────────┘     │  │  health   │  └────┬─────┘  └───────────────┘  │
-                     │  └─────┬─────┘       │                            │
-                     │        │             │                            │
-                     │  ┌─────▼─────┐  ┌───▼────────┐  ┌─────────────┐  │
-                     │  │ LangGraph │  │    dbt     │  │  Sandbox    │  │
-                     │  │  Agent    │  │  MySQL ->  │  │  Docker     │  │
-                     │  │           │  │  DuckDB    │◄─┤  --network  │  │
-                     │  │ Gemini    │  │  models    │  │   none      │  │
-                     │  │ 3.5 Flash │  └────────────┘  │  ro mounts  │  │
-                     │  └─────┬─────┘                  └─────────────┘  │
-                     │        │                                         │
-                     │  ┌─────▼─────┐  ┌────────────┐                  │
-                     │  │  FAISS    │  │  DuckDB    │                  │
-                     │  │  Vector   │  │  Analytics │                  │
-                     │  │  Store    │  │  (read)    │                  │
-                     │  └───────────┘  └────────────┘                  │
-                     └──────────────────────────────────────────────────┘
-```
-
-### Data Flow
-
-1. **Ingestion**: Raw MySQL dump -> dbt staging models -> intermediate joins -> analytics marts (DuckDB)
-2. **Query**: User question -> FastAPI -> LangGraph agent -> Gemini 3.5 Flash generates SQL -> executes against DuckDB
-3. **Analysis**: Agent optionally spawns Python analysis code -> sandbox Docker container -> results returned
-4. **Charts**: Agent optionally spawns matplotlib/plotly code -> sandbox -> chart artifact saved -> returned to frontend
-
-### Key Design Decisions
-
-| Decision | Rationale |
-|----------|-----------|
-| DuckDB over raw MySQL | OLAP-optimized, in-process, no server. dbt transforms create analytics-ready models. Agent queries denormalized marts, not raw transactional tables. |
-| dbt-duckdb over Snowflake | Runs locally, free, no cloud account. Same dbt experience (models, tests, docs, Jinja). |
-| Airflow (local) | Learning value for data engineering. Single-node, docker-compose. Schedules dbt runs. |
-| Sandbox (Docker) | Agent generates Python/SQL code. Must run isolated: --network none, CPU/mem caps, read-only DB mount, strict timeout. |
-| Gemini 3.5 Flash | Free tier, strong reasoning, same provider for embeddings (text-embedding-004). Single key. AWS removed. |
-| Zustand over useState | Chat state is simple but multi-step workflows (planner, multi-turn) add complexity. Zustand is 1KB gzipped, minimal overhead. |
-| Tailwind v4 (raw) | No component library. The existing UI has a specific pill-button gradient aesthetic that raw Tailwind preserves without fighting shadcn/shadcn defaults. |
-| JWT auth | API-key insufficient for session-scoped access. JWT with refresh tokens, rate-limited per user. |
-| Local-only backend | HIPAA constraints. Real patient data never leaves the machine. Frontend on Vercel is a static shell. |
-
-## 3. Phase Breakdown
-
-### Phase 0: Foundation (Structural Overhaul)
-
-Bring the repository into AGENTS.md compliance without changing any feature behavior. This phase creates the scaffolding that all subsequent work depends on.
-
-**Makefile**: All 6 required targets (setup, dev, test, style, build, clean). Plus project-specific: infra-up, infra-down, dbt-run, eval.
-
-**TypeScript migration**: Convert all .jsx to .tsx with strict tsconfig.json. Define typed props interfaces for all components. Convert api.js to api.ts with typed request/response shapes.
-
-**TailwindCSS v4**: Replace plain CSS files with Tailwind utility classes. Delete *.css files. Preserve the existing pill-button gradient aesthetic.
-
-**Zustand**: Centralize chat state (messages, isLoading, sessionId, connectionStatus) into a Zustand store. Components become thin presentational layers.
-
-**Package manager**: uv for Python (pyproject.toml replaces requirements.txt). Keep npm for frontend.
-
-**Formatters/linters**: black + ruff (backend), Prettier + ESLint (frontend).
-
-**Tests**: pytest for backend (mirroring core/, api/v1/ structure). Vitest + React Testing Library for frontend. Test coverage for all existing functionality.
-
-**Docs**: Create docs/problem.md, docs/design.md (this file), docs/features.json.
-
-**Config consolidation**: Move core/config.py -> utils/config.py. Remove manual load_dotenv(), use pure BaseSettings with model_config. Rename Langsmith_API_KEY -> langsmith_api_key.
-
-### Phase 1: Rebrand
-
-Every reference to old names becomes "CaliperLens".
-
-- Rename GitHub repo from Caliper-SQL-generator to CaliperLens. Update local remote.
-- README: update clone URLs, project title, description.
-- package.json: "name": "caliperlens"
-- index.html: <title>CaliperLens -- AI-Powered Healthcare Analytics</title>
-- main.py: title="CaliperLens API", version 2.0.0
-- Navbar/ChatInterface: brand text "CaliperLens", remove standalone "Caliper" references
-- LICENSE: fill copyright line. Evaluate whether Apache 2.0 is the right license for desired usage restrictions.
-- Remove foresighthealth_logo.jpeg, foresighthealth_logo-removebg-preview.png
-- Remove root package-lock.json (empty placeholder)
-
-### Phase 2: LLM Migration (AWS -> Gemini 3.5 Flash)
-
-- Delete AWS_ACCESS_KEY, AWS_SECRET_KEY, AWS_SESSION_TOKEN from settings. Delete boto3.
-- Use langchain-google-genai for both ChatGoogleGenerativeAI and GoogleGenerativeAIEmbeddings. Single GEMINI_API_KEY.
-- Clean config: utils/config.py, pure BaseSettings (no os.getenv() in defaults, no manual load_dotenv()). All credentials via settings object.
-- Remove os.environ blocks in agent.py. Inject settings via dependency.
-- Model: gemini-3.5-flash for reasoning, text-embedding-004 for embeddings.
-- Keep fallback provider logic (generic pattern, not AWS-specific).
-- Update .env.example: remove AWS keys, keep GEMINI_API_KEY.
-
-### Phase 3: Data Pipeline (dbt + DuckDB + Airflow)
-
-The data pipeline transforms raw MySQL tables into analytics-ready DuckDB marts.
-
-**dbt project structure:**
-```
-dbt/
-  models/
-    staging/
-      stg_patient.sql           -- raw MySQL views cast to DuckDB types
-      stg_lob.sql
-      stg_patient_score.sql
-      ...
-    intermediate/
-      int_patient_scores.sql    -- joined patient + scores + insurance
-      int_patient_conditions.sql -- patient + diagnoses
-      ...
-    marts/
-      dim_patients.sql          -- patient dimension (SCD type 1)
-      dim_conditions.sql        -- condition/diagnosis dimension
-      fct_patient_metrics.sql   -- fact table: one row per patient-metric
-      fct_interventions.sql     -- intervention transactions
-```
-
-**Airflow DAG:** A single DAG (caliperlens_pipeline) that runs dbt run on a schedule (daily or on-demand via make dbt-run). Uses the dbt-duckdb adapter. Airflow runs locally via docker-compose.airflow.yaml.
-
-**Agent impact:** The agent adopts a tiered query strategy that maximizes simplicity while retaining the graph-based pathfinder as a safety net for edge cases:
-
-**Tier 1 — Single mart (80% of queries):** The agent queries a single analytics mart directly. `fct_patient_metrics` already contains patient demographics, insurance, organization, and all risk scores in one row. Queries like "top 5 Medicaid patients by SDOH score" require zero joins — just WHERE, ORDER BY, LIMIT.
-
-**Tier 2 — Two-mart join on shared key (15%):** All marts share `patient_id`. A query like "intervention costs for high-SDOH patients" joins `fct_patient_metrics` and `fct_interventions` on `patient_id`. No pathfinding needed — the same column name exists on both sides. A simple foreign key dictionary replaces Dijkstra for this tier.
-
-**Tier 3 — Edge queries via staging fallback (5%):** A genuinely novel query that crosses tables not covered by the marts (e.g., filtering by a column that was deliberately excluded from the mart). The agent falls back to querying dbt staging models (1:1 mirrors of raw MySQL tables, materialized in DuckDB). The SchemaGraph (NetworkX) pathfinder still operates against these staging tables to discover join paths. The graph is preserved, not deleted — it is downgraded from the default path to a safety net.
-
-The SchemaRAG context library is rebuilt against dbt model documentation (auto-generated via `dbt docs generate` + manual medical terminology annotations). Both the mart descriptions and staging table descriptions are indexed, so the agent can discover whether a question is Tier 1/2 or needs Tier 3.
-
-**MySQL retention:** The MySQL source database is still loaded (raw dump). It serves as the immutable source of truth. All dbt transforms are idempotent and re-runnable.
-
-### Phase 4: Sandbox
-
-All agent-generated code runs inside isolated Docker containers.
-
-**Container spec:**
-- Base image: python:3.12-slim
-- Network: --network none (no internet access)
-- Resources: --cpus=1, --memory=256m, --pids-limit=50
-- Timeout: 30 seconds per execution
-- Mounts: DuckDB database file mounted read-only, writable /tmp for output artifacts
-
-**Execution flow:**
-1. Agent generates Python code string (analysis or chart generation)
-2. Backend writes code to a temp file
-3. Docker run with code mounted, DB mounted read-only
-4. Captures stdout, stderr, exit code, and any output files (charts as PNG/SVG)
-5. Returns results to the agent for final answer synthesis
-
-**Security properties:**
-- No network access prevents exfiltration
-- Read-only DB mount prevents data modification
-- CPU/memory caps prevent resource exhaustion
-- Timeout prevents runaway processes
-- pids-limit prevents fork bombs
-
-### Phase 5: Eval Harness
-
-Objective measurement of agent quality. Required before any agent behavior changes.
-
-**questions.json structure:**
-```json
-[
-  {
-    "id": "eval_001",
-    "category": "simple_select",
-    "question": "How many patients are in the database?",
-    "expected_sql_contains": ["SELECT COUNT", "FROM"],
-    "expected_result_shape": {"type": "scalar", "min": 1},
-    "max_joins": 1,
-    "tables_required": ["dim_patients"]
-  }
-]
-```
-
-**Categories:** simple_select, filtered_select, join, aggregation, multi_step, edge_case (binary UUID handling, LIMIT enforcement, org_id filtering).
-
-**Runner (runner.py):** Iterates questions, sends each to the agent endpoint, validates SQL structure (contains expected clauses), validates result shape (type, range, row count), reports pass/fail with detailed reason. Generates pass-rate and auto-repair-rate (questions that passed on retry after first failure).
-
-**Integration:** make eval runs the harness. CI runs it on every push via GitHub Actions.
-
-### Phase 6: Planner + Multi-turn Memory + RAG Preprocessing
-
-Upgrades the agent from single-shot query generation to multi-step workflow execution, and moves RAG from a reactive LLM tool to a deterministic preprocessing step.
-
-**RAG as preprocessing (graph simplification):**
-
-Currently the RAG is a tool the LLM must decide to call mid-graph — costing LLM roundtrips for "should I search for tables?", variable quality (the LLM chooses search terms), and an 8-node graph. This changes to a preprocessing step that runs once before the graph:
+## Architecture
 
 ```
-User query
-    → RAG search (deterministic, always runs): top-K relevant tables + schemas
-    → enriched prompt injected into initial state
-    → graph: generate_query → check_query → run_tools → validate_answer
-              ↑__________________________________________↓  (retry loop)
-                          → generate_final_answer → END
+┌───────────────────────────────────────────────────────────────────┐
+│                        Local Docker Host                           │
+│                                                                   │
+│  ┌──────────┐   ┌──────────┐   ┌───────────────┐                  │
+│  │ FastAPI  │   │ Airflow  │   │ Prometheus    │                  │
+│  │ Backend  │   │ (dbt)    │   │ + Grafana     │                  │
+│  │ :8000    │   │          │   │ :9090 :3001   │                  │
+│  └─────┬────┘   └────┬─────┘   └───────────────┘                  │
+│        │             │                                            │
+│  ┌─────▼──────────┐  │  ┌──────────────────┐                      │
+│  │ LangGraph Agent│  │  │ dbt transforms   │                      │
+│  │ Gemini 3.5     │  │  │ MySQL → DuckDB   │                      │
+│  │ Flash          │  │  │ staging → inter  │                      │
+│  │                │  │  │ mediate → marts  │                      │
+│  └───┬───┬───┬────┘  │  └──────────────────┘                      │
+│      │   │   │       │                                            │
+│  ┌───▼─┐ ┌▼──▼──┐ ┌─▼──────────┐                                  │
+│  │RAG  │ │Graph │ │  Sandbox    │                                  │
+│  │FAISS│ │NetwkX│ │  Docker     │                                  │
+│  │     │ │      │ │  --net=none │                                  │
+│  └─────┘ └──────┘ │  ro mounts  │                                  │
+│                   └─────────────┘                                  │
+└───────────────────────────────────────────────────────────────────┘
 ```
 
-Benefits: 3 nodes eliminated (list_tables_node, call_get_schema_node, get_schema_node), zero LLM roundtrips spent on table discovery, the LLM gets schema context upfront like a human analyst, and RAG table discovery tools remain available as Tier-3 fallback tools but no longer gate the primary path.
+### Data flow
 
-The enriched prompt includes: the user's original question, top-K relevant tables with column schemas, and the Tier-2 FK dictionary (patient_id shared across marts). Example:
+1. **Ingestion**: MySQL dump → dbt pipeline (staging → intermediate → marts) → DuckDB analytics file
+2. **Preprocessing**: User question → FAISS RAG search → enriched prompt with relevant tables + tier strategy
+3. **Agent execution**: 6-node LangGraph (planner → generate → check → execute → validate → answer) with retry loop
+4. **Analysis/Charts**: Agent writes Python → sandbox Docker container executes → results returned
+5. **Observability**: Prometheus `/metrics` + LangSmith traces + JSON structured logs with trace IDs
+
+---
+
+## Technology Choices
+
+| Choice | Why |
+|---|---|
+| **DuckDB** | In-process OLAP, zero servers, single-file database. Blazing fast analytics. |
+| **dbt (dbt-duckdb)** | Industry-standard analytics engineering. Pre-compute complex joins at build time instead of discovering them at query time. |
+| **Apache Airflow** | Schedules daily dbt runs. Dockerized, single-node. |
+| **Gemini 3.5 Flash** | Free tier, strong SQL generation. Same provider for embeddings — single API key. |
+| **LangGraph** | State-machine agent orchestration with built-in checkpointing, tool binding, and conditional edges. |
+| **FAISS + text-embedding-004** | Semantic schema search. Maps user terminology ("Medicaid") to technical table names. |
+| **NetworkX (SchemaGraph)** | Dijkstra join-pathfinding for edge-case queries the data marts cannot answer. |
+| **Docker Sandbox** | All generated code runs isolated: no network, memory/cpu caps, timeout, read-only DB. |
+| **JWT (python-jose + passlib bcrypt)** | Access + refresh tokens, rate-limited per user. org_id scoping from claims. |
+| **Prometheus + Grafana** | Request latency, error rate, throughput metrics. Pre-built dashboard. |
+| **Structured JSON logging** | Every log line carries trace_id + session_id + node for end-to-end reconstruction. |
+| **Zustand** | 1KB state management for frontend chat state. |
+| **BUSL-1.1** | Free for personal/portfolio/educational use. Commercial use requires license. |
+
+---
+
+## The Data Pipeline
+
+### Why it exists
+
+Raw MySQL tables are normalized (3NF). A query like "top Medicaid patients by SDOH score" requires a 4-hop join: `patient → map_patient_metrics → lob → patient_score` through a bridge table. The agent used NetworkX/Dijkstra to discover this path every time.
+
+dbt pre-computes these joins at build time. The agent queries a single denormalized mart (`fct_patient_metrics`) that already contains demographics, insurance, and all five risk scores in one row. The join complexity moved from query-time (where the LLM stumbles) to build-time (where it is deterministic and testable).
+
+### dbt layers
+
+**Staging (10 models, views):** 1:1 mirrors of MySQL tables. `LOAD mysql; ATTACH ... AS mysql_source (TYPE mysql, READ_ONLY)` connects DuckDB to MySQL at the start of each run. Views — DuckDB reads through transparently, no data copy.
+
+**Intermediate (4 models, tables):** Pre-computed join paths. `int_patient_insurance` resolves the 4-hop `patient → map_patient_metrics → lob → organization` path. `int_patient_scores` keeps only the latest score per patient. `int_patient_conditions` and `int_patient_interventions` resolve the diagnosis and intervention paths. Materialized as tables so the join is done once, not per query.
+
+**Marts (4 models, tables):** Analytics-ready, denormalized. `fct_patient_metrics` is the workhorse — one row per patient with everything pre-joined. `fct_interventions`, `dim_patients`, `dim_conditions` cover the rest. All marts share `patient_id` as a common key.
+
+Every mart has `not_null` and `unique` tests on primary keys, and `relationships` tests across marts. Model descriptions with medical terminology feed into the RAG index.
+
+### Airflow orchestration
+
+Runs locally via `docker-compose.airflow.yaml` (webserver + scheduler + postgres). The `caliperlens_pipeline` DAG runs daily: `dbt deps → dbt run → dbt test → dbt docs`. Manual trigger via `make dbt-run`.
+
+---
+
+## Tiered Query Strategy
+
+Not every question needs full analytical firepower. The system classifies every query into one of three tiers in `backend/core/tiered_strategy.py`:
+
+**Tier 1 — Single mart (~80% of queries):** RAG returns tables from one mart. Zero joins. `SELECT ... FROM fct_patient_metrics WHERE ...`.
+
+**Tier 2 — Two-mart join (~15%):** RAG returns tables from two marts. Both share `patient_id`. Simple `JOIN ON patient_id = patient_id`. The FK dictionary (`MART_SHARED_KEYS`) confirms shared keys; no pathfinding needed.
+
+**Tier 3 — Staging fallback (~5%):** The marts do not cover this query. Agent falls back to staging views (1:1 MySQL mirrors) and uses the SchemaGraph (NetworkX/Dijkstra) to discover join paths. The graph is preserved as a safety net.
+
+---
+
+## The Agent
+
+### Preprocessing
+
+Before the LangGraph runs, the user's question is passed through the FAISS RAG. The vector store was indexed at startup against every database table, enriched with hand-written business context (table roles, medical terminology, query patterns). The search returns top-K semantically relevant tables with their schemas.
+
+The `tiered_strategy` module classifies the result and builds an enriched prompt containing: user question, relevant table schemas, and an explicit strategy instruction ("No joins needed" or "Join on patient_id").
+
+### Graph
+
+6 nodes, 2 conditional edges, 1 retry loop:
 
 ```
-User Question: show top 5 medicaid patients with highest SDOH score
-
-Relevant Tables:
-  fct_patient_metrics (patient_id, first_name, last_name, insurance_name,
-    sdoh_score, comprehensive_score, hcc_score, org_id, org_name)
-  dim_conditions (patient_id, condition_name, condition_category)
-
-Generate SQL to answer the question. Use LIMIT 10. Use HEX() for binary IDs.
-Filter by Organization ID if provided.
+planner → generate → check → run_tools → validate → final_answer → END
+             ↑__________________retry_________________↓
 ```
 
-**Planner node:** A new LangGraph node inserted at the start of the graph. Receives the enriched prompt, generates an ordered execution plan:
-```
-Plan: [
-  { step: 1, action: "query", description: "Find top 5 Medicaid patients by SDOH score" },
-  { step: 2, action: "analyze", description: "Compute mean/median/stdev of scores" },
-  { step: 3, action: "chart", description: "Bar chart of scores per patient" }
-]
-```
+**Planner:** Decomposes the question into a structured `Plan` (Pydantic-validated JSON with `PlanStep` items: step number, action type `query|analyze|chart`, description, status). On failure, a `re_plan_prompt` generates a revised approach.
 
-**Task-state tracking:** A plan_state dict tracks per-step status (pending, running, done, failed). The planner outputs a structured JSON plan object validated against a Pydantic schema.
+**Generate Query:** Binds 12 tools to the LLM (SQL execution, RAG search, graph pathfinding, schema inspection, data sampling, Python sandbox execution, analysis, chart generation). System prompt includes the enriched RAG context plus a mandatory instruction: *do not stop until you have run a SELECT query and received data rows.*
 
-**Re-planning on failure:** If a step fails (invalid SQL, sandbox error, validation failure), the graph routes back to the planner with the error context. The planner generates a revised plan (different query approach, simplified analysis, etc.) rather than blind-retrying the same approach.
+**Check Query:** Syntax validator. Converts raw SQL text into tool calls. Enforces `LIMIT 10`. Passes reasoning/research tools through unchanged.
 
-**Multi-turn memory:** The MemorySaver already exists in the codebase. This phase upgrades it:
-- Conversation history preserved across messages in a session
-- The agent can reference previous queries ("compare those results to the previous chart")
-- Session state includes the plan history so follow-up questions like "now break that down by insurance type" reuse the prior plan context
-- Session IDs stored in localStorage on the frontend; backend routes by session_id
+**Run Tools:** LangGraph `ToolNode` executes whatever the LLM requested.
 
-### Phase 7: Auth + Security
+**Validate Answer:** Four-layer quality assurance. Detects premature termination (gave up before querying). Forces progression from research tools to execution. Detects binary garbage (forces `HEX()` retry). Sends SQL + result to Gemini for final semantic validation. Retries up to 3 times before answering with available data.
 
-- **JWT auth:** POST /api/v1/auth/login returns access + refresh tokens. All /api/v1/* endpoints require Authorization: Bearer header. Token validation in FastAPI middleware/dependency.
-- **Rate limiting:** Per-user rate limit on /api/v1/chat (e.g., 20 requests/minute). Implemented via slowapi or a simple Redis-backed counter.
-- **DB credentials:** DuckDB database mounted read-only into sandbox. MySQL connection uses a dedicated read-only user (SELECT only, no INSERT/UPDATE/DELETE/DROP).
-- **Secrets audit:** No credentials in logs, traces, or error messages. LangSmith traces sanitized of API keys. .env.example reflects only GEMINI_API_KEY, DB_*, SECRET_KEY, LANGSMITH_API_KEY.
-- **org_id scoping:** The hardcoded org_id=16 in main.py becomes a configurable parameter validated against the JWT claims (per-user org access).
+**Generate Final Answer:** Synthesizes SQL results into natural language.
 
-### Phase 8: Infra + CI
+### Tools exposed to the LLM
 
-- **Dockerfile:** Multi-stage build for the FastAPI backend. Production image runs uvicorn with gunicorn workers.
-- **docker-compose.yaml:** Orchestrates: backend, Airflow (webserver + scheduler + postgres), Prometheus, Grafana, sandbox image pre-built. Single make infra-up boots everything.
-- **GitHub Actions:** .github/workflows/ci.yaml: checkout, make setup, make style, make test, make eval. Runs on push to main and PRs.
-- **Health check:** GET /api/v1/health returns status of all downstream dependencies (DuckDB connectivity, Gemini API reachability, sandbox docker availability).
+SQL execution, semantic table search (FAISS), join pathfinding (Dijkstra), schema and column inspection, data sampling, global value search, sandboxed Python execution, statistical analysis, chart generation (bar/line/scatter/pie/histogram).
 
-### Phase 9: Observability
+### Multi-turn memory
 
-- **LangSmith:** Already partially configured (LANGSMITH_API_KEY in settings). Enable full tracing: node-by-node graph execution, tool calls with inputs/outputs, retry loops. Set LANGCHAIN_TRACING_V2=true.
-- **Prometheus metrics:** FastAPI endpoint /metrics exposes: request count, request latency histogram, per-LangGraph-node execution time, sandbox execution time, error rate counter. Prometheus scrapes locally.
-- **Grafana dashboard:** Pre-built dashboard JSON committed to repo. Panels: p95/p99 chat latency, plan success rate, sandbox execution time distribution, error rate by type (SQL syntax, timeout, validation failure), cost per query (Gemini token usage).
-- **Structured logging:** python-json-logger with trace IDs. Every log line includes trace_id, session_id, and node_name. Enables grep-able reconstruction of any single query's full execution path.
+LangGraph's `MemorySaver` checkpointing is configured with `thread_id = session_id`. Conversation history persists across messages in the same session. Session IDs are stored in the frontend's localStorage and routed via the API.
 
-### Phase 10: Analysis + Charts
+---
 
-Built on phase 4 (sandbox) and phase 6 (planner). The agent can now perform statistical analysis and generate visualizations.
+## SchemaRAG (FAISS)
 
-**Analysis routines:** The planner can schedule an "analyze" step. The agent generates Python code that:
-- Loads query results (passed as JSON to the sandbox)
-- Computes descriptive statistics (mean, median, stddev, quartiles)
-- Performs trend detection (linear regression on time-series data)
-- Returns structured analysis as JSON
+At startup, every database table is indexed into a FAISS vector store. Each document combines two parts:
 
-**Chart routines:** The planner can schedule a "chart" step. The agent generates Python code that:
-- Uses matplotlib (no plotly, avoids heavy deps — matplotlib is already in the sandbox image)
-- Produces PNG chart artifacts written to /tmp
-- Chart files are returned to the frontend as base64-encoded images
-- Supported chart types: bar, line, scatter, histogram, pie
+**Business context** — Hand-written descriptions: table roles ("contributor_type is the master dictionary of conditions like Anxiety, Diabetes"), medical terminology ("SDOH = Social Determinants of Health"), and query pattern workflows (step-by-step instructions for diagnosis/insurance/organization queries). The `TABLE_TO_CONTEXTS` mapping associates each table with relevant context tags.
 
-**Output contracts:** Both analysis and chart routines have Pydantic-schema-validated return types. Analysis returns a typed dict with stats fields. Chart returns {chart_type, chart_data_base64, title}.
+**Technical schema** — `CREATE TABLE` DDL with column names and types.
 
-## 4. Dependencies & Sequencing
+The combined document is embedded via `text-embedding-004` and stored in FAISS. At query time, `search_tables(query)` performs similarity search returning the top-K most semantically relevant tables. Because business context is indexed alongside technical schema, a search for "insurance type" returns `fct_patient_metrics` (which has `insurance_name`) even though "type" does not appear in the column name.
 
-```
-Phase 0 (Foundation)
-   |
-Phase 1 (Rebrand) -- parallelizable with Phase 0
-   |
-Phase 2 (LLM Migration)
-   |
-Phase 3 (Data Pipeline) -- can partially overlap with Phase 2
-   |
-Phase 4 (Sandbox)
-   |
-Phase 5 (Eval Harness)
-   |
-Phase 6 (Planner + Multi-turn) -- needs eval baseline first
-   |
-Phase 7 (Auth + Security)
-   |
-Phase 8 (Infra + CI)
-   |
-Phase 9 (Observability)
-   |
-Phase 10 (Analysis + Charts) -- needs sandbox + planner
-```
+Marts are indexed alongside staging tables, so the RAG returns the right tier for each query.
 
-Phases 0 and 1 can run in parallel (independent file sets). All others are sequential.
+---
 
-## 5. Files Never Touched
+## SchemaGraph (NetworkX)
 
-- data/ directory (MySQL dump files — input only)
-- The MySQL source database itself (reads via dbt, never writes)
+A NetworkX graph of the database schema — nodes are tables, edges are JOIN relationships with `on` clauses and weights. Edges come from two sources: auto-discovered foreign keys from `information_schema.KEY_COLUMN_USAGE` (weight 1.0), and manually injected edges for logical relationships not enforced by constraints (7 hardcoded paths through bridge tables).
 
-## 6. Deprecated Assets (to remove during Foundation/Rebrand)
+`find_connection_query(table_names)` anchors on `patient`, runs Dijkstra shortest path to every other table, and assembles a `FROM ... JOIN ... ON ...` clause. Used only at Tier 3 — queries the marts cannot answer.
 
-- AWS credentials from .env and config
-- foresighthealth_logo.jpeg and foresighthealth_logo-removebg-preview.png
-- Root package-lock.json (empty placeholder)
-- requirements.txt (replaced by pyproject.toml + uv)
-- All *.jsx files (migrated to *.tsx)
-- All *.css files (replaced by Tailwind)
-- core/config.py (moved to utils/config.py)
+---
+
+## Sandbox
+
+All agent-generated Python code runs inside isolated Docker containers. The `SandboxExecutor` class wraps docker-py:
+
+**Image:** Python 3.12-slim + matplotlib, non-root user.
+
+**Per execution:** A temp directory is created. Code is written to `script.py`. A container runs with `--network none` (no internet), `--memory=256m`, `--cpus=1`, `--pids-limit=50`, 30-second timeout. The DuckDB database is mounted read-only. stdout, stderr, exit code, and any artifacts (chart PNGs) are captured. The container and temp directory are cleaned up.
+
+**Tool integration:** `run_python_code_in_sandbox` (arbitrary Python), `analyze_data` (statistics using Python's `statistics` module), `generate_chart` (matplotlib, 5 chart types, base64 PNG output). All three execute through the sandbox.
+
+**Security properties:** No network access prevents exfiltration. Read-only DB mount prevents data modification. Resource caps prevent exhaustion. Non-root user prevents privilege escalation.
+
+---
+
+## API
+
+FastAPI on port 8000. CORS enabled. Agent initialized once at startup via lifespan context manager.
+
+| Endpoint | Auth | Rate Limit | Purpose |
+|---|---|---|---|
+| `GET /health` | None | None | Agent status |
+| `POST /auth/login` | None | None | Returns JWT access + refresh tokens |
+| `POST /auth/refresh` | None | None | Renews access token |
+| `POST /chat` | Bearer JWT | 20 req/min/user | Main query endpoint |
+
+### Authentication
+
+Passwords hashed with bcrypt via `passlib`. JWT tokens signed with HS256 via `python-jose`. Access token: 30-minute expiry. Refresh token: 7-day expiry. Tokens carry `sub` (username), `org_id`, and `exp` claims. A FastAPI `Depends(get_current_user)` validates the Bearer header and returns the token payload. `org_id` flows from JWT claims to the agent for row-level security filtering in SQL.
+
+### Rate limiting
+
+An in-memory `RateLimiter` class maintains a dictionary mapping user keys to lists of request timestamps. `is_allowed(key)` purges timestamps older than a 60-second sliding window, checks whether the remaining count exceeds 20, and appends the current timestamp if allowed. Per-key isolation prevents cross-user interference. A `lru_cache`'d factory creates a singleton instance. Applied as a dependency on `/chat`.
+
+---
+
+## Frontend
+
+React 18 + TypeScript + Vite + TailwindCSS v4. State management via Zustand.
+
+**Component tree:** `App → ChatInterface → ChatMessage (×N) + ChatInput`
+
+**ChatInterface:** On mount, health-checks backend, initializes session ID from localStorage. Manages message list, loading state, connection status. Navbar with CaliperLens branding, message area with empty state or scrollable message list, footer with connection badge + input.
+
+**ChatInput:** Textarea with auto-resize, Enter submits, Shift+Enter for newline.
+
+**ChatMessage:** Avatar + styled bubble (blue for user, gray for AI, red for errors). Renders inline chart images from base64 PNG data when present.
+
+**Zustand store:** `messages`, `isLoading`, `connectionStatus`, `sessionId` + actions. `clearMessages` resets state with a new session ID.
+
+**API service:** Native `fetch`. `API_URL` from `VITE_API_URL` env var, defaults to `localhost:8000`.
+
+---
+
+## Analysis & Charts
+
+Two tools execute via the sandbox using pre-defined code templates in `backend/core/analysis.py`:
+
+**`analyze_data`:** Accepts a JSON array of numbers. Template computes mean, median, stddev (Python `statistics` module), min, max, count. Includes trend detection (linear regression on recent values → "increasing"/"decreasing"/"stable"). Returns JSON.
+
+**`generate_chart`:** Accepts `[{label, value}]` arrays + chart type + title. Template generates a matplotlib figure (Agg backend), renders the selected chart type (bar/line/scatter/pie/histogram), saves to an in-memory buffer, base64-encodes the PNG. Returns JSON with `chart_data_base64`.
+
+Both use placeholder-based code templates to avoid f-string escaping issues. Output contracts validated via Pydantic schemas (`AnalysisResult`, `ChartResult`).
+
+---
+
+## Observability
+
+**Structured logging:** `python-json-logger` produces JSON log lines. A `TraceInjector` filter automatically adds `trace_id` (per-query UUID), `session_id`, and `node` (current LangGraph node) to every record. Logs go to daily files and stdout.
+
+**Prometheus:** `prometheus-fastapi-instrumentator` adds a `/metrics` endpoint exposing `http_requests_total` and `http_request_duration_seconds`. Scraped by Prometheus every 15s.
+
+**Grafana:** Pre-built dashboard with p95 latency, request rate, and error rate panels (port 3001).
+
+**LangSmith:** Full graph execution tracing when `LANGCHAIN_TRACING_V2=true`. Node-by-node traces, tool calls with inputs/outputs, retry loops. No code changes needed — LangChain auto-integrates.
+
+---
+
+## Evaluation Harness
+
+25 questions across six categories (simple_select, filtered_select, aggregation, join, multi_step, edge_case) in `eval/questions.json`. Each question specifies expected SQL fragments, result shape (scalar or rows with min/max bounds), and required tables.
+
+**Runner modes:**
+
+- `--check` (CI-safe): Validates question schema. No database needed. Runs on every push.
+- `--run` (requires DB + API key): Imports the agent, runs each question via `run_with_trace()`, validates generated SQL structure and result shape. Reports pass-rate and auto-repair-rate (retried-and-passed / retried).
+
+The agent's `run_with_trace()` method captures generated SQL queries, raw SQL results, and retry count during graph streaming — data the standard `run()` method discards.
+
+---
+
+## Infrastructure
+
+**Dockerfile:** Python 3.12-slim, uv-based install, uvicorn on :8000.
+
+**docker-compose.yaml:** Backend + Prometheus + Grafana. Backend mounts `/var/run/docker.sock` for spawning sandbox containers.
+
+**Airflow compose (separate):** `airflow/docker-compose.airflow.yaml` — webserver, scheduler, postgres. Custom image with dbt-duckdb installed. DAG triggers `dbt run` daily.
+
+**CI (GitHub Actions):** Three jobs — backend (ruff + pytest), frontend (tsc + eslint + vitest), eval (`--check`).
+
+**Makefile:** `setup`, `dev`, `test`, `style`, `build`, `clean`, `infra-up`, `infra-down`, `dbt-run`, `eval`, `help`.
+
+---
+
+## Boundaries
+
+- MySQL dump is input-only, never modified.
+- dbt transforms are idempotent and re-runnable.
+- Frontend is a static Vercel shell — no backend connection in production.
+- Sandbox uses Docker-out-of-Docker (`/var/run/docker.sock` mount).
+- Rate limiter is in-memory (single-instance).
+- License: BUSL-1.1 (converts to Apache 2.0 on 2030-01-01).
