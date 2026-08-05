@@ -25,7 +25,7 @@ async def chat_endpoint(request: ChatRequest):
         raise HTTPException(status_code=503, detail="Agent not initialized")
 
     try:
-        result = agent.run(request.query, session_id=request.session_id, org_id=None)
-        return ChatResponse(response=result)
+        trace = agent.run_with_trace(request.query, session_id=request.session_id, org_id=None)
+        return ChatResponse(response=trace["response"], success=True)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

@@ -1,7 +1,7 @@
 from typing import List
 
 from langchain.chat_models import init_chat_model
-from langchain.messages import AIMessage, HumanMessage, ToolMessage
+from langchain.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 from langchain_community.agent_toolkits import SQLDatabaseToolkit
 from langchain_community.utilities import SQLDatabase
 from langchain_core.runnables import RunnableConfig
@@ -9,12 +9,13 @@ from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, START, MessagesState, StateGraph
 from langgraph.prebuilt import ToolNode
 
+from backend.core.planner import Plan, PlanStep, planner_system_prompt
+from backend.core.tiered_strategy import build_enriched_prompt
 from backend.src.custom_tools import get_db_tools, run_python_code_in_sandbox
 from backend.src.graph_manager import SchemaGraph
 from backend.src.prompt_module import (
     answer_validation_prompt_module,
     generate_query_prompt_module,
-    select_table_prompt_module,
 )
 from backend.src.rag_manager import SchemaRAG
 from backend.utils.config import settings
@@ -24,9 +25,13 @@ from backend.utils.logger import get_logger
 logger = get_logger(__name__)
 
 
-class SQLAgentGenerator:
-    """LangGraph-based SQL Agent using Google Gemini 3.5 Flash."""
+class AgentState(MessagesState):
+    plan: Plan | None
+    user_context: dict
+    enriched_prompt: str
 
+
+class SQLAgentGenerator:
     def __init__(self, model_name: str = "google_genai:gemini-3.5-flash"):
         self.model_name = model_name
 
@@ -50,8 +55,7 @@ class SQLAgentGenerator:
 
     def _setup_database(self) -> SQLDatabase:
         try:
-            db_uri = settings.database_uri
-            return SQLDatabase.from_uri(db_uri, sample_rows_in_table_info=0)
+            return SQLDatabase.from_uri(settings.database_uri, sample_rows_in_table_info=0)
         except Exception as e:
             logger.error("Error setting up database")
             raise CustomException("Error setting up database", e)
@@ -62,36 +66,67 @@ class SQLAgentGenerator:
         custom_tools = get_db_tools(self.db, self.rag, self.graph_manager)
         return standard_tools + custom_tools + [run_python_code_in_sandbox]
 
-    def list_tables_node(self, state: MessagesState):
-        return {"messages": []}
+    def _preprocess(self, question: str) -> str:
+        rag_result = self.rag.search_tables(question)
+        return build_enriched_prompt(question, rag_result)
 
-    def call_get_schema_node(self, state: MessagesState):
-        system_prompt = select_table_prompt_module()
-        system_message = {"role": "system", "content": system_prompt}
+    def planner_node(self, state: AgentState) -> dict:
+        base_prompt = state.get("enriched_prompt", "")
+        system_message = {"role": "system", "content": planner_system_prompt()}
 
-        tools = [self.tool_map["sql_db_find_relevant_tables"], self.tool_map["sql_db_schema"]]
-        llm_with_tools = self.llm.bind_tools(tools)
+        user_messages = [msg for msg in state["messages"] if isinstance(msg, HumanMessage)]
+        last_question = user_messages[-1].content if user_messages else ""
 
-        response = llm_with_tools.invoke([system_message] + state["messages"])
-        return {"messages": [response]}
+        plan_prompt = f"""{base_prompt}
 
-    def generate_query_node(self, state: MessagesState):
+Decompose this question into a plan:
+{last_question}"""
+
+        response = self.llm.invoke([system_message, {"role": "user", "content": plan_prompt}])
+
+        try:
+            import json
+
+            content = response.content.strip()
+            if "```json" in content:
+                content = content.split("```json")[1].split("```")[0].strip()
+            elif "```" in content:
+                content = content.split("```")[1].split("```")[0].strip()
+            plan_data = json.loads(content)
+            plan = Plan(**plan_data)
+            logger.info(f"Plan created: {[s.description for s in plan.steps]}")
+        except Exception as e:
+            logger.warning(f"Plan parsing failed: {e}, using default plan")
+            plan = Plan(steps=[PlanStep(step=1, action="query", description=last_question)])
+
+        return {"plan": plan, "messages": [response]}
+
+    def generate_query_node(self, state: AgentState) -> dict:
         org_id = state.get("user_context", {}).get("org_id", 16)
-        base_prompt = generate_query_prompt_module(self.db, org_id=org_id)
+        plan = state.get("plan")
+        base_prompt = state.get("enriched_prompt", generate_query_prompt_module(self.db, org_id=org_id))
 
-        instruction = """
-        \n\n### EXECUTION PLAN
-        1. **RESEARCH PHASE:** If you don't know table names, use `sql_db_find_relevant_tables`.
-        2. **CONNECTION PHASE:** If you don't know how to join tables, use `sql_db_find_table_connections`.
-        3. **EXECUTION PHASE (CRITICAL):** Once you have the table names and join logic, you **MUST** run `sql_db_query`.
-           - **DO NOT STOP** after finding the schema or join path.
-           - You have not answered the user until you have run a SELECT query and received actual data rows.
-        4. **SECURITY:** You MUST filter by the Organization ID provided in the system prompt.
+        plan_step_text = ""
+        if plan and plan.steps:
+            pending = [s for s in plan.steps if s.status == "pending"]
+            if pending:
+                current = pending[0]
+                current.status = "running"
+                plan_step_text = f"\nCURRENT STEP: {current.description}"
 
-        ### DATA RULES
-        - Use `LIMIT 10` for all queries.
-        - For Binary IDs (like patient_id), use `BIN_TO_UUID(col)` or `HEX(col)`.
-        """
+        instruction = f"""
+{plan_step_text}
+
+### EXECUTION PLAN
+1. **RESEARCH PHASE:** If you don't know table names, use `sql_db_find_relevant_tables`.
+2. **CONNECTION PHASE:** If you don't know how to join tables, use `sql_db_find_table_connections`.
+3. **EXECUTION PHASE (CRITICAL):** Once you have the table names and join logic, you **MUST** run `sql_db_query`.
+4. **SECURITY:** You MUST filter by the Organization ID provided in the system prompt.
+
+### DATA RULES
+- Use `LIMIT 10` for all queries.
+- For Binary IDs (like patient_id), use `BIN_TO_UUID(col)` or `HEX(col)`.
+"""
 
         system_message = {"role": "system", "content": base_prompt + instruction}
 
@@ -108,9 +143,9 @@ class SQLAgentGenerator:
         llm_with_tools = self.llm.bind_tools(tools_to_bind)
         response = llm_with_tools.invoke([system_message] + state["messages"])
 
-        return {"messages": [response]}
+        return {"messages": [response], "plan": plan}
 
-    def check_query_node(self, state: MessagesState):
+    def check_query_node(self, state: AgentState) -> dict:
         last_message = state["messages"][-1]
         if not last_message.tool_calls:
             content = last_message.content.strip()
@@ -167,7 +202,7 @@ class SQLAgentGenerator:
 
         return {"messages": []}
 
-    def validate_answer_node(self, state: MessagesState):
+    def validate_answer_node(self, state: AgentState) -> dict:
         last_message = state["messages"][-1]
 
         if isinstance(last_message, AIMessage) and not last_message.tool_calls:
@@ -195,7 +230,6 @@ class SQLAgentGenerator:
 
                 if "sql_db_query" not in recent_tool_calls:
                     logger.warning("Agent terminated without executing sql_db_query. Forcing retry.")
-
                     return {
                         "messages": [
                             HumanMessage(
@@ -206,7 +240,7 @@ class SQLAgentGenerator:
     MANDATORY NEXT STEP: Use sql_db_query to run the following query structure:
 
     For '{user_question}', build a query that:
-    1. JOINs the necessary tables (patient, map_patient_metrics, lob, patient_score, etc.)
+    1. JOINs the necessary tables
     2. Filters WHERE conditions match the user's criteria
     3. Orders and limits results appropriately
     4. Uses HEX() or BIN_TO_UUID() for any BINARY columns
@@ -240,7 +274,7 @@ class SQLAgentGenerator:
                         return {
                             "messages": [
                                 HumanMessage(
-                                    content=f"SYSTEM FEEDBACK: Research tool '{tool_name}' complete. You have gathered information. NOW you MUST write and execute 'sql_db_query' to get the actual data rows that answer the user's question."
+                                    content=f"SYSTEM FEEDBACK: Research tool '{tool_name}' complete. Now write and execute 'sql_db_query'."
                                 )
                             ]
                         }
@@ -249,13 +283,18 @@ class SQLAgentGenerator:
             return {"messages": []}
 
         sql_result = last_message.content
+        plan = state.get("plan")
+        if plan and plan.steps:
+            for step in plan.steps:
+                if step.status == "running":
+                    step.status = "done"
 
         if "b'\\" in sql_result or "bytearray" in str(sql_result).lower():
-            logger.warning("Binary data detected in output. Triggering immediate retry.")
+            logger.warning("Binary data detected. Triggering retry.")
             return {
                 "messages": [
                     HumanMessage(
-                        content="SYSTEM FEEDBACK: Binary data detected (b'\\x00...'). Retry using HEX(column) or BIN_TO_UUID(column)."
+                        content="SYSTEM FEEDBACK: Binary data detected. Retry using HEX(column) or BIN_TO_UUID(column)."
                     )
                 ]
             }
@@ -286,18 +325,14 @@ class SQLAgentGenerator:
             )
 
             if retry_count >= 3:
-                return {
-                    "messages": [
-                        AIMessage(content="Maximum retries reached. I will try to answer with the data I have.")
-                    ]
-                }
+                return {"messages": [AIMessage(content="Maximum retries reached. Answering with available data.")]}
 
             feedback_text = validation_response.content.split("FEEDBACK:")[-1].strip()
             return {"messages": [HumanMessage(content=f"Validator Feedback: {feedback_text}")]}
 
-        return {"messages": [validation_response]}
+        return {"messages": [validation_response], "plan": plan}
 
-    def generate_final_answer_node(self, state: MessagesState):
+    def generate_final_answer_node(self, state: AgentState) -> dict:
         user_question = "Unknown"
         for msg in reversed(state["messages"]):
             if isinstance(msg, HumanMessage) and not msg.content.startswith("SYSTEM"):
@@ -321,13 +356,13 @@ class SQLAgentGenerator:
         final_response = self.llm.invoke(prompt)
         return {"messages": [final_response]}
 
-    def should_continue(self, state: MessagesState) -> str:
+    def should_continue(self, state: AgentState) -> str:
         last_message = state["messages"][-1]
         if not last_message.tool_calls:
             return "end"
         return "check_query"
 
-    def should_retry(self, state: MessagesState) -> str:
+    def should_retry(self, state: AgentState) -> str:
         last_message = state["messages"][-1]
 
         if isinstance(last_message, HumanMessage) and (
@@ -341,25 +376,23 @@ class SQLAgentGenerator:
         return "generate_final_answer"
 
     def _build_graph(self) -> StateGraph:
-        workflow = StateGraph(MessagesState)
+        workflow = StateGraph(AgentState)
         tools_node = ToolNode(self.tools)
 
-        workflow.add_node("list_tables", self.list_tables_node)
-        workflow.add_node("call_get_schema", self.call_get_schema_node)
-        workflow.add_node("get_schema", tools_node)
+        workflow.add_node("planner", self.planner_node)
         workflow.add_node("generate_query", self.generate_query_node)
         workflow.add_node("check_query", self.check_query_node)
         workflow.add_node("run_tools", tools_node)
         workflow.add_node("validate_answer", self.validate_answer_node)
         workflow.add_node("generate_final_answer", self.generate_final_answer_node)
 
-        workflow.add_edge(START, "list_tables")
-        workflow.add_edge("list_tables", "call_get_schema")
-        workflow.add_edge("call_get_schema", "get_schema")
-        workflow.add_edge("get_schema", "generate_query")
+        workflow.add_edge(START, "planner")
+        workflow.add_edge("planner", "generate_query")
 
         workflow.add_conditional_edges(
-            "generate_query", self.should_continue, {"check_query": "check_query", "end": END}
+            "generate_query",
+            self.should_continue,
+            {"check_query": "check_query", "end": END},
         )
 
         workflow.add_edge("check_query", "run_tools")
@@ -368,66 +401,18 @@ class SQLAgentGenerator:
         workflow.add_conditional_edges(
             "validate_answer",
             self.should_retry,
-            {"generate_query": "generate_query", "generate_final_answer": "generate_final_answer"},
+            {
+                "generate_query": "generate_query",
+                "generate_final_answer": "generate_final_answer",
+            },
         )
 
         workflow.add_edge("generate_final_answer", END)
 
         return workflow.compile(checkpointer=self.checkpointer)
 
-    def run(
-        self,
-        question: str,
-        session_id: str = "default_session",
-        config: RunnableConfig = None,
-        org_id: int | None = None,
-    ) -> str:
-        config = config or {}
-        config["configurable"] = {"thread_id": session_id}
-        config["recursion_limit"] = 50
-
-        logger.info(f"Session: {session_id} | Query: {question}")
-
-        initial_state = {
-            "messages": [{"role": "user", "content": question}],
-            "user_context": {"org_id": org_id},
-        }
-
-        final_response_content = ""
-
-        try:
-            for step in self.graph.stream(initial_state, config=config, stream_mode="values"):
-                last_msg = step["messages"][-1]
-                last_msg.pretty_print()
-
-                if isinstance(last_msg, AIMessage) and not last_msg.tool_calls and "STATUS:" not in last_msg.content:
-                    final_response_content = last_msg.content
-        except Exception as e:
-            logger.error(f"Error processing query: {e}")
-            final_response_content = f"I encountered an error: {str(e)}"
-
-        return final_response_content
-
-    def run_with_trace(
-        self,
-        question: str,
-        session_id: str = "eval_session",
-        org_id: int | None = None,
-    ) -> dict:
-        """Run the agent and capture the generated SQL, raw results, and retry count.
-
-        Used by the eval harness to validate SQL structure and result shapes.
-        """
-        config = {"configurable": {"thread_id": session_id}, "recursion_limit": 50}
-
-        logger.info(f"Eval Session: {session_id} | Query: {question}")
-
-        initial_state = {
-            "messages": [{"role": "user", "content": question}],
-            "user_context": {"org_id": org_id},
-        }
-
-        final_response_content = ""
+    def _stream_trace(self, initial_state: dict, config: dict) -> dict:
+        final_response = ""
         sql_queries: list[str] = []
         sql_results: list[str] = []
         retries = 0
@@ -450,14 +435,58 @@ class SQLAgentGenerator:
                     retries += 1
 
                 if isinstance(last_msg, AIMessage) and not last_msg.tool_calls and "STATUS:" not in last_msg.content:
-                    final_response_content = last_msg.content
+                    final_response = last_msg.content
         except Exception as e:
-            logger.error(f"Error processing eval query: {e}")
-            final_response_content = f"I encountered an error: {str(e)}"
+            logger.error(f"Error streaming: {e}")
+            final_response = f"Error: {e}"
 
         return {
-            "response": final_response_content,
+            "response": final_response,
             "sql_queries": sql_queries,
             "sql_results": sql_results,
             "retries": retries,
         }
+
+    def run(
+        self,
+        question: str,
+        session_id: str = "default_session",
+        config: RunnableConfig = None,
+        org_id: int | None = None,
+    ) -> str:
+        config = config or {}
+        config["configurable"] = {"thread_id": session_id}
+        config["recursion_limit"] = 50
+
+        enriched_prompt = self._preprocess(question)
+
+        initial_state = {
+            "messages": [SystemMessage(content=enriched_prompt), HumanMessage(content=question)],
+            "user_context": {"org_id": org_id},
+            "enriched_prompt": enriched_prompt,
+            "plan": None,
+        }
+
+        logger.info(f"Session: {session_id} | Query: {question}")
+        trace = self._stream_trace(initial_state, config)
+        return trace["response"]
+
+    def run_with_trace(
+        self,
+        question: str,
+        session_id: str = "eval_session",
+        org_id: int | None = None,
+    ) -> dict:
+        config = {"configurable": {"thread_id": session_id}, "recursion_limit": 50}
+
+        enriched_prompt = self._preprocess(question)
+
+        initial_state = {
+            "messages": [SystemMessage(content=enriched_prompt), HumanMessage(content=question)],
+            "user_context": {"org_id": org_id},
+            "enriched_prompt": enriched_prompt,
+            "plan": None,
+        }
+
+        logger.info(f"Eval Session: {session_id} | Query: {question}")
+        return self._stream_trace(initial_state, config)
