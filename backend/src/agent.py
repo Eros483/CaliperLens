@@ -407,3 +407,57 @@ class SQLAgentGenerator:
             final_response_content = f"I encountered an error: {str(e)}"
 
         return final_response_content
+
+    def run_with_trace(
+        self,
+        question: str,
+        session_id: str = "eval_session",
+        org_id: int | None = None,
+    ) -> dict:
+        """Run the agent and capture the generated SQL, raw results, and retry count.
+
+        Used by the eval harness to validate SQL structure and result shapes.
+        """
+        config = {"configurable": {"thread_id": session_id}, "recursion_limit": 50}
+
+        logger.info(f"Eval Session: {session_id} | Query: {question}")
+
+        initial_state = {
+            "messages": [{"role": "user", "content": question}],
+            "user_context": {"org_id": org_id},
+        }
+
+        final_response_content = ""
+        sql_queries: list[str] = []
+        sql_results: list[str] = []
+        retries = 0
+
+        try:
+            for step in self.graph.stream(initial_state, config=config, stream_mode="values"):
+                last_msg = step["messages"][-1]
+
+                if isinstance(last_msg, AIMessage) and last_msg.tool_calls:
+                    for tc in last_msg.tool_calls:
+                        if tc.get("name") == "sql_db_query":
+                            query = tc.get("args", {}).get("query", "")
+                            if query:
+                                sql_queries.append(query)
+
+                if isinstance(last_msg, ToolMessage) and last_msg.name == "sql_db_query":
+                    sql_results.append(str(last_msg.content))
+
+                if isinstance(last_msg, HumanMessage) and "FEEDBACK" in last_msg.content:
+                    retries += 1
+
+                if isinstance(last_msg, AIMessage) and not last_msg.tool_calls and "STATUS:" not in last_msg.content:
+                    final_response_content = last_msg.content
+        except Exception as e:
+            logger.error(f"Error processing eval query: {e}")
+            final_response_content = f"I encountered an error: {str(e)}"
+
+        return {
+            "response": final_response_content,
+            "sql_queries": sql_queries,
+            "sql_results": sql_results,
+            "retries": retries,
+        }

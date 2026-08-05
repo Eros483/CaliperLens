@@ -50,3 +50,10 @@ jobs:
 
       - name: Test
         run: cd frontend && npm run test
+
+  eval:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate eval questions
+        run: python3 eval/runner.py --check

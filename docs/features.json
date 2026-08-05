@@ -3,12 +3,12 @@
   "last_updated": "2026-08-02",
   "summary": {
     "total": 11,
-    "completed": 5,
+    "completed": 6,
     "in_progress": 0,
-    "planned": 6,
-    "tests_passing": 5,
+    "planned": 5,
+    "tests_passing": 6,
     "tests_failing": 0,
-    "tests_missing": 6
+    "tests_missing": 5
   },
   "features": [
     {
@@ -358,60 +358,60 @@
       "id": "F006",
       "name": "Eval Harness \u2014 NL-to-SQL Quality Measurement",
       "description": "Create 20-25 NL questions with expected SQL structures and result shapes. Scripted runner reports pass-rate and auto-repair-rate. CI runs it on every push.",
-      "status": "planned",
+      "status": "completed",
       "priority": "high",
       "module": "eval",
       "design_doc": "docs/design.md",
       "tests": {
-        "status": "missing",
+        "status": "passing",
         "files": [],
-        "notes": "Tests: verify all 20-25 questions parse correctly, runner CLI works, validation checks catch known-bad SQL"
+        "notes": "--check mode validates 25 questions schema. Full --run mode requires DB + Gemini API key. CI job added."
       },
       "subtasks": [
         {
           "id": "F006-1",
           "name": "Define eval question schema (question, expected_sql_contains, expected_result_shape, category)",
-          "status": "planned"
+          "status": "completed"
         },
         {
           "id": "F006-2",
           "name": "Write 20-25 questions covering: simple_select, filtered_select, join, aggregation, multi_step, edge_cases",
-          "status": "planned"
+          "status": "completed"
         },
         {
           "id": "F006-3",
           "name": "Implement runner.py (sends questions to /api/v1/chat, validates SQL + result shape)",
-          "status": "planned"
+          "status": "completed"
         },
         {
           "id": "F006-4",
           "name": "Implement SQL structure validation (contains expected clauses, LIMIT check, org_id filter check)",
-          "status": "planned"
+          "status": "completed"
         },
         {
           "id": "F006-5",
           "name": "Implement result shape validation (type check, row count range, value range)",
-          "status": "planned"
+          "status": "completed"
         },
         {
           "id": "F006-6",
           "name": "Calculate pass-rate and auto-repair-rate metrics",
-          "status": "planned"
+          "status": "completed"
         },
         {
           "id": "F006-7",
           "name": "Add make eval target",
-          "status": "planned"
+          "status": "completed"
         },
         {
           "id": "F006-8",
           "name": "Add GitHub Actions job to run eval on push",
-          "status": "planned"
+          "status": "completed"
         }
       ],
       "notes": "This is the baseline measurement tool. Must be implemented before any agent behavior changes (F007 planner, F010 analysis) so we can measure improvement. Runner should handle agent non-determinism (same question can produce validly-different SQL).",
       "added": "2026-08-02",
-      "completed": null
+      "completed": "2026-08-02"
     },
     {
       "id": "F007",

@@ -1,0 +1,233 @@
+[
+  {
+    "id": "eval_001",
+    "category": "simple_select",
+    "question": "How many patients are in the database?",
+    "expected_sql_contains": ["SELECT", "COUNT", "FROM"],
+    "expected_result_shape": {"type": "scalar", "min": 1},
+    "tables_required": ["fct_patient_metrics", "dim_patients"],
+    "notes": "Count all patients. Either mart works."
+  },
+  {
+    "id": "eval_002",
+    "category": "simple_select",
+    "question": "List all patients with their first names and last names.",
+    "expected_sql_contains": ["SELECT", "FROM"],
+    "expected_result_shape": {"type": "rows", "min_rows": 1},
+    "tables_required": ["fct_patient_metrics", "dim_patients"],
+    "notes": "Select names from patient table."
+  },
+  {
+    "id": "eval_003",
+    "category": "filtered_select",
+    "question": "How many Medicaid patients are there?",
+    "expected_sql_contains": ["SELECT", "COUNT", "WHERE"],
+    "expected_result_shape": {"type": "scalar", "min": 0},
+    "tables_required": ["fct_patient_metrics"],
+    "sql_patterns": ["medicaid"],
+    "notes": "Count patients with insurance_name containing Medicaid."
+  },
+  {
+    "id": "eval_004",
+    "category": "filtered_select",
+    "question": "Show me the names of patients with a SDOH score above 80.",
+    "expected_sql_contains": ["SELECT", "FROM", "WHERE", "sdoh"],
+    "expected_result_shape": {"type": "rows", "min_rows": 0},
+    "tables_required": ["fct_patient_metrics"],
+    "notes": "Filter on sdoh_score > 80."
+  },
+  {
+    "id": "eval_005",
+    "category": "filtered_select",
+    "question": "How many patients have Medicare as their insurance?",
+    "expected_sql_contains": ["SELECT", "COUNT", "WHERE"],
+    "expected_result_shape": {"type": "scalar", "min": 0},
+    "tables_required": ["fct_patient_metrics"],
+    "sql_patterns": ["medicare"],
+    "notes": "Count with insurance filter."
+  },
+  {
+    "id": "eval_006",
+    "category": "filtered_select",
+    "question": "List all patients born after January 1, 1990.",
+    "expected_sql_contains": ["SELECT", "FROM", "WHERE", "date_of_birth"],
+    "expected_result_shape": {"type": "rows", "min_rows": 0},
+    "tables_required": ["fct_patient_metrics", "dim_patients"],
+    "notes": "Date filter on date_of_birth."
+  },
+  {
+    "id": "eval_007",
+    "category": "aggregation",
+    "question": "What is the average SDOH score of all patients?",
+    "expected_sql_contains": ["AVG", "FROM"],
+    "expected_result_shape": {"type": "scalar", "min": 0},
+    "tables_required": ["fct_patient_metrics"],
+    "notes": "Average sdoh_score."
+  },
+  {
+    "id": "eval_008",
+    "category": "aggregation",
+    "question": "How many patients are there per insurance type?",
+    "expected_sql_contains": ["COUNT", "GROUP BY", "insurance"],
+    "expected_result_shape": {"type": "rows", "min_rows": 1},
+    "tables_required": ["fct_patient_metrics"],
+    "notes": "Group by insurance_name."
+  },
+  {
+    "id": "eval_009",
+    "category": "aggregation",
+    "question": "What is the total cost of all interventions?",
+    "expected_sql_contains": ["SUM", "FROM"],
+    "expected_result_shape": {"type": "scalar", "min": 0},
+    "tables_required": ["fct_interventions"],
+    "notes": "Sum cost_actual."
+  },
+  {
+    "id": "eval_010",
+    "category": "aggregation",
+    "question": "What is the total intervention cost per insurance type?",
+    "expected_sql_contains": ["SUM", "GROUP BY", "insurance"],
+    "expected_result_shape": {"type": "rows", "min_rows": 1},
+    "tables_required": ["fct_interventions"],
+    "notes": "Sum cost_actual grouped by insurance_name."
+  },
+  {
+    "id": "eval_011",
+    "category": "join",
+    "question": "Show the names of patients who have had interventions, and their intervention names.",
+    "expected_sql_contains": ["SELECT", "JOIN"],
+    "expected_result_shape": {"type": "rows", "min_rows": 0},
+    "tables_required": ["fct_interventions"],
+    "notes": "Join fct_interventions to get patient names (Tier 2)."
+  },
+  {
+    "id": "eval_012",
+    "category": "join",
+    "question": "List patients and their conditions with onset dates.",
+    "expected_sql_contains": ["SELECT", "JOIN"],
+    "expected_result_shape": {"type": "rows", "min_rows": 0},
+    "tables_required": ["dim_conditions"],
+    "notes": "Query dim_conditions for patient conditions."
+  },
+  {
+    "id": "eval_013",
+    "category": "join",
+    "question": "Show patients with the condition Anxiety along with their insurance type.",
+    "expected_sql_contains": ["SELECT", "JOIN", "WHERE"],
+    "expected_result_shape": {"type": "rows", "min_rows": 0},
+    "tables_required": ["fct_patient_metrics", "dim_conditions"],
+    "sql_patterns": ["anxiety"],
+    "notes": "Join fct_patient_metrics + dim_conditions on patient_id, filter condition."
+  },
+  {
+    "id": "eval_014",
+    "category": "multi_step",
+    "question": "What is the average intervention cost for Medicaid patients?",
+    "expected_sql_contains": ["AVG", "JOIN", "WHERE"],
+    "expected_result_shape": {"type": "scalar", "min": 0},
+    "tables_required": ["fct_interventions"],
+    "sql_patterns": ["medicaid"],
+    "notes": "Join interventions to insurance, filter Medicaid, average cost."
+  },
+  {
+    "id": "eval_015",
+    "category": "multi_step",
+    "question": "How many patients with SDOH score above 75 also had an intervention?",
+    "expected_sql_contains": ["JOIN", "WHERE", "sdoh"],
+    "expected_result_shape": {"type": "scalar", "min": 0},
+    "tables_required": ["fct_patient_metrics", "fct_interventions"],
+    "notes": "Join on patient_id, filter sdoh, count."
+  },
+  {
+    "id": "eval_016",
+    "category": "simple_select",
+    "question": "What are the distinct insurance types in the database?",
+    "expected_sql_contains": ["DISTINCT", "insurance"],
+    "expected_result_shape": {"type": "rows", "min_rows": 1},
+    "tables_required": ["fct_patient_metrics"],
+    "notes": "Distinct insurance_name."
+  },
+  {
+    "id": "eval_017",
+    "category": "edge_case",
+    "question": "Show the top 5 patients with the highest SDOH score.",
+    "expected_sql_contains": ["LIMIT", "ORDER BY", "sdoh"],
+    "expected_result_shape": {"type": "rows", "min_rows": 1, "max_rows": 6},
+    "tables_required": ["fct_patient_metrics"],
+    "notes": "ORDER BY sdoh DESC LIMIT 5."
+  },
+  {
+    "id": "eval_018",
+    "category": "edge_case",
+    "question": "Show the names of patients with the condition Diabetes.",
+    "expected_sql_contains": ["SELECT", "FROM", "WHERE"],
+    "expected_result_shape": {"type": "rows", "min_rows": 0},
+    "tables_required": ["dim_conditions", "fct_patient_metrics"],
+    "sql_patterns": ["diabetes", "like"],
+    "notes": "Filter condition_name LIKE %Diabetes%."
+  },
+  {
+    "id": "eval_019",
+    "category": "edge_case",
+    "question": "How many patients have no insurance information?",
+    "expected_sql_contains": ["WHERE", "NULL"],
+    "expected_result_shape": {"type": "scalar", "min": 0},
+    "tables_required": ["fct_patient_metrics"],
+    "notes": "WHERE insurance_name IS NULL."
+  },
+  {
+    "id": "eval_020",
+    "category": "aggregation",
+    "question": "What is the highest SDOH score in the database?",
+    "expected_sql_contains": ["MAX", "sdoh"],
+    "expected_result_shape": {"type": "scalar", "min": 0},
+    "tables_required": ["fct_patient_metrics"],
+    "notes": "MAX(sdoh_score)."
+  },
+  {
+    "id": "eval_021",
+    "category": "filtered_select",
+    "question": "List all female patients with a comprehensive score below 60.",
+    "expected_sql_contains": ["WHERE", "sex", "comprehensive"],
+    "expected_result_shape": {"type": "rows", "min_rows": 0},
+    "tables_required": ["fct_patient_metrics"],
+    "notes": "Filter sex + score."
+  },
+  {
+    "id": "eval_022",
+    "category": "simple_select",
+    "question": "List all intervention names that exist in the system.",
+    "expected_sql_contains": ["SELECT", "DISTINCT", "intervention"],
+    "expected_result_shape": {"type": "rows", "min_rows": 1},
+    "tables_required": ["fct_interventions"],
+    "notes": "Distinct intervention_name."
+  },
+  {
+    "id": "eval_023",
+    "category": "multi_step",
+    "question": "For each insurance type, show the average SDOH score and patient count.",
+    "expected_sql_contains": ["AVG", "COUNT", "GROUP BY", "insurance"],
+    "expected_result_shape": {"type": "rows", "min_rows": 1},
+    "tables_required": ["fct_patient_metrics"],
+    "notes": "AVG + COUNT grouped by insurance_name."
+  },
+  {
+    "id": "eval_024",
+    "category": "multi_step",
+    "question": "Show the total intervention cost for patients who have a diagnosis of Hypertension.",
+    "expected_sql_contains": ["SUM", "JOIN", "WHERE"],
+    "expected_result_shape": {"type": "scalar", "min": 0},
+    "tables_required": ["fct_interventions", "dim_conditions"],
+    "sql_patterns": ["hypertension", "like"],
+    "notes": "Join dim_conditions + fct_interventions on patient_id."
+  },
+  {
+    "id": "eval_025",
+    "category": "edge_case",
+    "question": "List the patients with the 10 lowest quality scores.",
+    "expected_sql_contains": ["ORDER BY", "LIMIT", "quality"],
+    "expected_result_shape": {"type": "rows", "min_rows": 1, "max_rows": 11},
+    "tables_required": ["fct_patient_metrics"],
+    "notes": "ORDER BY quality ASC LIMIT 10."
+  }
+]

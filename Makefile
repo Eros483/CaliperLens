@@ -46,9 +46,9 @@ infra-down:
 dbt-run:
 	cd dbt && dbt run
 
-## Run the NL-to-SQL eval harness
+## Run the NL-to-SQL eval harness (schema check only, CI-safe)
 eval:
-	cd eval && python runner.py
+	python eval/runner.py --check
 
 ## Show this help
 help:
