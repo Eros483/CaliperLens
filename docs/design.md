@@ -133,7 +133,31 @@ planner → generate → check → run_tools → validate → final_answer → E
 
 ### Tools exposed to the LLM
 
-SQL execution, semantic table search (FAISS), join pathfinding (Dijkstra), schema and column inspection, data sampling, global value search, sandboxed Python execution, statistical analysis, chart generation (bar/line/scatter/pie/histogram).
+| Tool | Type | Responsibility |
+|---|---|---|
+| `sql_db_query` | Execution | Execute SQL against the database |
+| `sql_db_find_relevant_tables` | Research (RAG) | Semantic vector search for table discovery |
+| `sql_db_find_table_connections` | Reasoning (Graph) | Dijkstra-based join pathfinding |
+| `sql_db_query_distinct_values` | Research | Inspect unique values in a column (with keyword filter) |
+| `sql_db_sample_rows` | Research | Preview 3 rows from a table |
+| `sql_db_get_foreign_keys` | Reasoning | List explicitly defined foreign keys |
+| `sql_db_get_column_info` | Research | Detailed column type/comment inspection |
+| `sql_db_find_value_location` | Research | Locate which table/column holds a given value |
+| `run_python_code_in_sandbox` | Execution (Sandbox) | Arbitrary Python in an isolated Docker container |
+| `analyze_data` | Execution (Sandbox) | Statistics (mean/median/stddev, trend detection) |
+| `generate_chart` | Execution (Sandbox) | matplotlib charts (bar/line/scatter/pie/histogram) |
+
+Only the first eight are bound during SQL generation (`generate_query`); the sandbox tools are bound for the analysis/chart stages.
+
+### Guardrails
+
+| Guardrail | Description |
+|---|---|
+| Binary UUID Protection | Wraps `BINARY(16)` columns with `HEX()` / `BIN_TO_UUID()` — the #1 source of query errors |
+| Hallucination Check | Graph validates join paths before SQL generation |
+| Syntax Correction | Auto-adds `LIMIT 10`, converts raw SQL text into tool calls |
+| Data Verification | Detects binary garbage / empty results, forces a `HEX()` retry |
+| Org Scoping | Enforces organization-based row-level security (`WHERE organization.org_id = {org_id}`) |
 
 ### Multi-turn memory
 

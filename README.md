@@ -19,46 +19,6 @@ An agentic natural-language-to-SQL engine for querying complex healthcare datase
 
 <div align="left">
 
-## Directory Overview
-
-```
-backend/
-├── api/v1/                # Versioned route handlers
-│   └── router.py
-├── src/
-│   ├── agent.py           # Main LangGraph Agent definition
-│   ├── custom_tools.py    # Tools exposed to the LLM
-│   ├── graph_manager.py   # NetworkX Logic for join path discovery
-│   ├── prompt_module.py   # System Prompts for different agent states
-│   └── rag_manager.py     # FAISS Vector Store for schema search
-├── schemas/
-│   └── chat.py            # API Request/Response models
-├── utils/
-│   ├── config.py          # Pydantic settings
-│   ├── logger.py          # Custom logging configuration
-│   └── custom_exception.py
-├── tests/
-│   ├── test_api/          # API endpoint tests
-│   └── test_core/         # Core logic tests
-└── main.py                # FastAPI Entry point
-
-frontend/
-├── src/
-│   ├── components/        # React components
-│   ├── store/             # Zustand state management
-│   ├── services/          # API call functions
-│   └── __tests__/         # Vitest component tests
-├── index.html
-├── vite.config.ts
-├── tsconfig.json
-└── package.json
-
-docs/
-├── problem.md             # Original problem statement
-├── design.md              # Architecture & design document
-└── features.json          # Feature tracker
-```
-
 ## Getting Started
 
 ```bash
@@ -76,28 +36,74 @@ make test     # Run all tests
 make style    # Format + lint
 ```
 
-## Tools
+For the complete architecture — agent graph, tools exposed to the LLM, guardrails, data pipeline, and infra — see [docs/design.md](docs/design.md).
 
-| Tool | Type | Responsibility |
-|---|---|---|
-| sql_db_query | Execution | Execute SQL against the database |
-| sql_db_find_relevant_tables | Research (RAG) | Semantic vector search for table discovery |
-| sql_db_find_table_connections | Reasoning (Graph) | Dijkstra-based join pathfinding |
-| sql_db_schema | Research | Return CREATE TABLE DDL and column metadata |
-| sql_db_query_distinct_values | Research | Inspect unique values in a column |
-| sql_db_sample_rows | Research | Preview 3 rows from a table |
-| sql_db_get_foreign_keys | Reasoning | List explicitly defined foreign keys |
-| sql_db_get_column_info | Research | Detailed column type/comment inspection |
+## System Flow
 
-## Guardrails
+The diagram shows the two pipelines that keep CaliperLens running: the **offline data pipeline** (MySQL → DuckDB, scheduled by Airflow) and the **online query pipeline** (user question → validated answer).
 
-| Guardrail | Description |
-|---|---|
-| Binary UUID Protection | Wraps BINARY(16) columns with HEX() / BIN_TO_UUID() |
-| Hallucination Check | Graph validates join paths before SQL generation |
-| Syntax Correction | Auto-adds LIMIT clauses, converts raw SQL to tool calls |
-| Data Verification | Detects binary garbage / empty results, triggers retry |
-| Org Scoping | Enforces organization-based row-level security |
+```mermaid
+flowchart LR
+    subgraph DATA["Data engineering pipeline (offline)"]
+        direction LR
+        MYSQL["MySQL dump"] --> DBT["dbt transforms"] --> DUCK["DuckDB"]
+    end
+
+    USER["User"] --> FE["React frontend"] --> AGENT["LangGraph agent"]
+    AGENT -->|queries| DUCK
+    AGENT --> RAG["FAISS RAG"]
+    AGENT --> GRAPH["SchemaGraph"]
+    AGENT --> SANDBOX["Docker sandbox"]
+    AGENT --> API["FastAPI"] --> FE
+```
+
+## Directory Overview
+
+```
+├── backend/               # FastAPI + LangGraph agent
+│   ├── api/v1/            # Versioned route handlers (thin)
+│   ├── core/              # Business logic (auth, sandbox, analysis, planner, tiers)
+│   ├── src/               # Agent internals
+│   │   ├── agent.py           # Main LangGraph Agent definition
+│   │   ├── custom_tools.py    # Tools exposed to the LLM
+│   │   ├── graph_manager.py   # NetworkX logic for join path discovery
+│   │   ├── prompt_module.py   # System prompts for agent states
+│   │   └── rag_manager.py     # FAISS vector store for schema search
+│   ├── schemas/           # Pydantic request/response models
+│   ├── utils/             # Config, logger, exceptions
+│   ├── tests/             # test_api/ + test_core/ (mirror module layout)
+│   └── main.py            # FastAPI entry point
+│
+├── frontend/              # React + Vite + TS chat UI
+│   ├── src/
+│   │   ├── components/    # ChatInterface, ChatMessage, ChatInput
+│   │   ├── store/         # Zustand chat state
+│   │   ├── services/      # API call functions
+│   │   └── __tests__/     # Vitest component tests
+│   ├── public/
+│   ├── index.html
+│   └── (vite.config.ts, tsconfig.json, package.json)
+│
+├── dbt/                   # dbt project: staging → intermediate → marts
+│   └── models/
+│       ├── staging/       # 1:1 MySQL mirrors (views)
+│       ├── intermediate/  # pre-computed joins (tables)
+│       └── marts/         # analytics-ready models (tables)
+│
+├── airflow/               # Airflow DAGs + docker-compose for dbt scheduling
+├── sandbox/               # Docker image for isolated code execution
+├── eval/                  # NL-to-SQL eval harness (questions.json + runner.py)
+├── grafana/               # Grafana dashboard provisioning
+├── docs/
+│   ├── problem.md         # Original problem statement
+│   ├── design.md          # Architecture & design document
+│   └── features.json      # Feature tracker
+│
+├── Makefile               # Single entry point for setup/dev/test/style/build
+├── docker-compose.yaml    # Backend + Prometheus + Grafana
+├── prometheus.yml
+└── Dockerfile
+```
 
 ## License
 
